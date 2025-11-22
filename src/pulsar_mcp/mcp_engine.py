@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack
 from pathlib import Path
 
 from mcp import StdioServerParameters, ClientSession, stdio_client
-from mcp.types import ListToolsResult, Tool
+from mcp.types import ListToolsResult, Tool, CallToolResult
 
 from .settings import ApiKeysSettings
 from .services.embedding import EmbeddingService
@@ -243,35 +243,21 @@ class MCPEngine:
             logger.error(f"Error shutting down server '{server_name}': {e}")
             return False
 
-    async def execute_tool(self, server_name: str, tool_name: str, arguments: dict) -> dict:
+    async def execute_tool(self, server_name: str, tool_name: str, arguments: Optional[dict]=None) -> CallToolResult:
         session = self.hmap_mcp_server_to_session.get(server_name)
         if not session:
-            return {"error": f"Server '{server_name}' not running"}
+            raise Exception(f"Server '{server_name}' is not running")
 
-        try:
-            result = await session.call_tool(name=tool_name, arguments=arguments)
-            clean_contents = []
-            for content in result.content:
-                content_dict = content.model_dump()
-                content_dict.pop("annotations", None)
-                content_dict.pop("meta", None)
-                clean_contents.append(content_dict)
+        result = await session.call_tool(name=tool_name, arguments=arguments)
+        clean_contents = []
+        for content in result.content:
+            content_dict = content.model_dump()
+            content_dict.pop("annotations", None)
+            content_dict.pop("meta", None)
+            clean_contents.append(content_dict)
 
-            return {
-                "success": True,
-                "server_name": server_name,
-                "tool_name": tool_name,
-                "results": clean_contents
-            }
+        return result
 
-        except Exception as e:
-            logger.error(f"Error executing tool '{tool_name}' on server '{server_name}': {e}")
-            return {
-                "success": False,
-                "server_name": server_name,
-                "tool_name": tool_name,
-                "error": str(e)
-            }
 
     def list_running_servers(self) -> list:
         return list(self.hmap_mcp_server_to_session.keys())
