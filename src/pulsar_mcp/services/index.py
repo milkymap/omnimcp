@@ -16,8 +16,8 @@ class IndexService:
         self.qdrant_storage_path = qdrant_storage_path
         
     async def __aenter__(self):
-        self.client = AsyncQdrantClient(path=self.qdrant_storage_path)
-        if not await self.client.collection_exists(self.index_name):
+        self.client = AsyncQdrantClient(url="http://localhost:6333")
+        if not await self.client.collection_exists(collection_name=self.index_name):
             await self.client.create_collection(
                 collection_name=self.index_name,
                 vectors_config=models.VectorParams(
@@ -54,7 +54,7 @@ class IndexService:
             ]
         )
     
-    async def add_tool(self, server_name, tool_name:str, tool_description:str, tool_schema:str, embedding:List[float]):
+    async def add_tool(self, server_name, tool_name:str, tool_description:str, tool_schema:Dict[str, Any], embedding:List[float]):
         tool_id = f"{server_name}::{tool_name}"
         await self.client.upsert(
             collection_name=self.index_name,
@@ -73,7 +73,7 @@ class IndexService:
             ]
         )
         
-    async def get_server(self, server_name:str) -> Dict[str, Any]:
+    async def get_server(self, server_name:str) -> Optional[Dict[str, Any]]:
         server_id = str(uuid5(namespace=NAMESPACE_DNS, name=server_name))
         result = await self.client.retrieve(
             collection_name=self.index_name,
@@ -82,10 +82,10 @@ class IndexService:
             with_vectors=False
         )
         if not result or len(result) == 0:
-            raise ValueError(f"Server {server_name} not found in vector store.")
+            return None
         return result[0].payload
         
-    async def get_tool(self, server_name:str, tool_name:str) -> Dict[str, Any]:
+    async def get_tool(self, server_name:str, tool_name:str) -> Optional[Dict[str, Any]]:
         await self.get_server(server_name)  # Ensure server exists
 
         tool_id = str(uuid5(namespace=NAMESPACE_DNS, name=f"{server_name}::{tool_name}"))
@@ -96,7 +96,7 @@ class IndexService:
             with_vectors=False
         )
         if not result or len(result) == 0:
-            raise ValueError(f"Tool {tool_name} not found in vector store for server {server_name}.")
+            return None
         return result[0].payload
 
     async def delete_server(self, server_name:str) -> Dict[str, Any]:
