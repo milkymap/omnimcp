@@ -50,13 +50,16 @@ class MCPServer:
     def define_tools(self, mcp:FastMCP, mcp_engine:MCPEngine):
         @mcp.tool(
             name="semantic_search",
-            description="Search for MCP servers or tools using natural language queries."
+            description="Search across indexed MCP servers and tools using natural language. Returns ranked results with relevance scores, server names, and tool names. Use scope='server' for servers only, scope='tool' for tools only, or leave unset for mixed results. Set server_names to limit tool search to specific servers. Use enhanced=False to skip LLM query enhancement for faster search."
         )
-        async def semantic_search(query: str, limit: int = 10, scope: Optional[List[str]] = None, server_names: list[str] = None) -> ToolResult:
+        async def semantic_search(query: str, limit: int = 10, scope: Optional[List[str]] = None, server_names: list[str] = None, enhanced: bool = True) -> ToolResult:
             try:
-                enhanced_query = await mcp_engine.descriptor_service.enhance_query_with_llm(query)
+                if enhanced:
+                    enhanced_query = await mcp_engine.descriptor_service.enhance_query_with_llm(query)
+                else:
+                    enhanced_query = query
+
                 query_embedding = await mcp_engine.embedding_service.create_embedding([enhanced_query])
-                print(enhanced_query)
                 all_results = await mcp_engine.index_service.search(
                     embedding=query_embedding[0],
                     top_k=limit,
@@ -106,7 +109,7 @@ class MCPServer:
 
         @mcp.tool(
             name="get_server_info",
-            description="Get detailed information about a specific MCP server."
+            description="Get comprehensive information about a specific MCP server including title, summary, capabilities, limitations, and tool count. Essential for understanding server capabilities before use."
         )
         async def get_server_info(server_name: str) -> ToolResult:
             try:
@@ -148,7 +151,7 @@ class MCPServer:
 
         @mcp.tool(
             name="list_indexed_servers",
-            description="List all currently indexed MCP servers with minimal info."
+            description="Browse all indexed MCP servers with server names, titles, and tool counts. Supports pagination with limit and offset. Ideal for discovering available servers in your ecosystem."
         )
         async def list_indexed_servers(limit: int = 20, offset: Optional[str] = None) -> ToolResult:
             try:
@@ -190,7 +193,7 @@ class MCPServer:
 
         @mcp.tool(
             name="list_server_tools",
-            description="List tool names available on a specific MCP server."
+            description="Get all tool names available on a specific MCP server. Returns just the tool names for quick browsing. Use get_tool_details for full schemas before execution."
         )
         async def list_server_tools(server_name: str, limit:int=50, offset:Optional[str]=None) -> ToolResult:
             try:
@@ -227,9 +230,7 @@ class MCPServer:
 
         @mcp.tool(
             name="get_tool_details",
-            description="""Get detailed information about a specific tool by name and server.
-            This provides comprehensive details about a tool including its schema and enhanced description.
-            """
+            description="Get complete tool information including enhanced description and full JSON schema. Critical for understanding tool parameters before execution. Always use this before calling execute_tool."
         )
         async def get_tool_details(tool_name: str, server_name: str) -> ToolResult:
             try:
@@ -271,7 +272,7 @@ class MCPServer:
 
         @mcp.tool(
             name="manage_server",
-            description="Start or shutdown an MCP server."
+            description="Start or shutdown MCP servers to manage active sessions. Use action='start' to launch servers for tool execution, or action='shutdown' to terminate sessions and free resources."
         )
         async def manage_server(server_name: str, action: str) -> ToolResult:
             try:
@@ -313,7 +314,7 @@ class MCPServer:
 
         @mcp.tool(
             name="list_running_servers",
-            description="List all currently running MCP servers."
+            description="Show all currently active MCP server sessions. Lists server names that are ready for tool execution. Servers must be running before you can execute tools on them."
         )
         async def list_running_servers() -> ToolResult:
             try:
@@ -348,7 +349,7 @@ class MCPServer:
 
         @mcp.tool(
             name="execute_tool",
-            description="Execute a tool on a running MCP server."
+            description="Execute a specific tool on a running MCP server with provided arguments. Preserves original tool output format (text, images, JSON, etc.). Server must be started first via manage_server."
         )
         async def execute_tool(server_name: str, tool_name: str, arguments: dict = None, timeout:float=60) -> ToolResult:
             try:
