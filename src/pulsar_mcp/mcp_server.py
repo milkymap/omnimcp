@@ -1,3 +1,7 @@
+import json 
+
+from typing import List
+
 from contextlib import asynccontextmanager
 from fastmcp import FastMCP
 from fastmcp.tools.tool import ToolResult
@@ -27,7 +31,8 @@ class MCPServer:
         )
     
     async def run_server(self):
-        await self.mcp.run_async(transport="stdio")
+        #await self.mcp.run_async(transport="stdio")
+        await self.mcp.run_async(transport="http", host="localhost", port=8000)
 
     @asynccontextmanager
     async def lifespan(self, mcp:FastMCP):
@@ -47,13 +52,13 @@ class MCPServer:
             name="semantic_search",
             description="Search for MCP servers or tools using natural language queries."
         )
-        async def semantic_search(query: str, limit: int = 10, scope: Optional[str] = None, server_names: list[str] = None) -> ToolResult:
+        async def semantic_search(query: str, limit: int = 10, scope: Optional[List[str]] = None, server_names: list[str] = None) -> ToolResult:
             try:
                 enhanced_query = await mcp_engine.descriptor_service.enhance_query_with_llm(query)
                 query_embedding = await mcp_engine.embedding_service.create_embedding([enhanced_query])
-
+                print(enhanced_query)
                 all_results = await mcp_engine.index_service.search(
-                    query_embedding=query_embedding[0],
+                    embedding=query_embedding[0],
                     top_k=limit,
                     server_names=server_names,
                     scope=scope
@@ -80,7 +85,7 @@ class MCPServer:
                 result_text = f"Found {len(minimal_results)} results for query: '{query}'"
                 if scope:
                     result_text += f" (scope: {scope})"
-
+                
                 guidance_text = "Next steps:\n"
                 guidance_text += "• For servers: Use get_server_info to see capabilities and limitations\n"
                 guidance_text += "• For tools: Use get_tool_details to see full schema before execution\n"
@@ -89,14 +94,9 @@ class MCPServer:
                 return ToolResult(
                     content=[
                         TextContent(type="text", text=result_text),
+                        *[ TextContent(type="text", text=json.dumps(res)) for res in minimal_results],
                         TextContent(type="text", text=guidance_text)
-                    ],
-                    meta={
-                        "query": query,
-                        "scope": scope,
-                        "results": minimal_results,
-                        "total_found": len(minimal_results)
-                    }
+                    ]
                 )
 
             except Exception as e:
@@ -117,21 +117,18 @@ class MCPServer:
                         content=[TextContent(type="text", text=f"Server '{server_name}' not found in index")]
                     )
 
-                payload = server_info.get('payload', {})
                 info_text = f"Server: {server_name}\n"
-                info_text += f"Title: {payload.get('title', 'Unknown')}\n"
-                info_text += f"Tools: {payload.get('nb_tools', 0)}\n\n"
-                info_text += f"Summary: {payload.get('summary', 'No summary available')}\n\n"
+                info_text += f"Title: {server_info.get('title')}\n"
+                info_text += f"Tools: {server_info.get('nb_tools')}\n\n"
+                info_text += f"Summary: {server_info.get('summary')}\n\n"
 
-                if payload.get('capabilities'):
-                    info_text += "Capabilities:\n"
-                    for cap in payload.get('capabilities', []):
-                        info_text += f"• {cap}\n"
+                info_text += "Capabilities:\n"
+                for cap in server_info.get('capabilities'):
+                    info_text += f"• {cap}\n"
 
-                if payload.get('limitations'):
-                    info_text += "\nLimitations:\n"
-                    for lim in payload.get('limitations', []):
-                        info_text += f"• {lim}\n"
+                info_text += "\nLimitations:\n"
+                for lim in server_info.get('limitations'):
+                    info_text += f"• {lim}\n"
 
                 guidance_text = f"Next steps:\n"
                 guidance_text += f"• Use list_server_tools('{server_name}') to see available tools\n"
@@ -141,11 +138,7 @@ class MCPServer:
                     content=[
                         TextContent(type="text", text=info_text),
                         TextContent(type="text", text=guidance_text)
-                    ],
-                    meta={
-                        "server_name": server_name,
-                        "server_info": server_info
-                    }
+                    ]
                 )
 
             except Exception as e:
@@ -159,7 +152,7 @@ class MCPServer:
         )
         async def list_indexed_servers(limit: int = 20, offset: Optional[str] = None) -> ToolResult:
             try:
-                servers = await mcp_engine.index_service.list_servers(
+                servers, offset = await mcp_engine.index_service.list_servers(
                     limit=limit,
                     offset=offset
                 )
@@ -181,18 +174,13 @@ class MCPServer:
                 guidance_text += "• Use get_server_info(server_name) for detailed capabilities\n"
                 guidance_text += "• Use list_server_tools(server_name) to browse tools\n"
                 guidance_text += "• Use semantic_search(query, scope='server') for targeted search"
+                guidance_text += f"• Use offset '{offset}' for next page of results" if offset else "Last page of results"
 
                 return ToolResult(
                     content=[
                         TextContent(type="text", text=result_text),
                         TextContent(type="text", text=guidance_text)
-                    ],
-                    meta={
-                        "servers": minimal_servers,
-                        "total_servers": total_servers,
-                        "limit": limit,
-                        "offset": offset
-                    }
+                    ]
                 )
 
             except Exception as e:
@@ -204,10 +192,10 @@ class MCPServer:
             name="list_server_tools",
             description="List tool names available on a specific MCP server."
         )
-        async def list_server_tools(server_name: str) -> ToolResult:
+        async def list_server_tools(server_name: str, limit:int=50, offset:Optional[str]=None) -> ToolResult:
             try:
-                tools = await mcp_engine.index_service.list_tools(
-                    server_names=[server_name]
+                tools, offset = await mcp_engine.index_service.list_tools(
+                    server_name=server_name,
                 )
 
                 tool_names = []
@@ -222,17 +210,13 @@ class MCPServer:
                 guidance_text += f"• Use get_tool_details('{server_name}', 'tool_name') for schema\n"
                 guidance_text += f"• Use manage_server('{server_name}', 'start') before execution\n"
                 guidance_text += "• Always check tool schema before calling execute_tool"
+                guidance_text += f"• Use offset '{offset}' for next page of results" if offset else "Last page of results"
 
                 return ToolResult(
                     content=[
                         TextContent(type="text", text=result_text),
                         TextContent(type="text", text=guidance_text)
-                    ],
-                    meta={
-                        "server_name": server_name,
-                        "tool_names": tool_names,
-                        "total_tools": len(tool_names)
-                    }
+                    ]
                 )
 
             except Exception as e:
@@ -255,17 +239,19 @@ class MCPServer:
                 )
 
                 if tool_info is None:
-                    return ToolResult(
-                        content=[TextContent(type="text", text=f"Tool '{tool_name}' not found on server '{server_name}'")]
-                    )
+                    raise ValueError(f"Tool '{tool_name}' not found on server '{server_name}'")
 
-                payload = tool_info.get('payload', {})
+                if tool_info.get('tool_schema') is None:
+                    raise ValueError(f"Tool '{tool_name}' on server '{server_name}' has no schema available")
+                
+                if tool_info.get('tool_description') is None:
+                    raise ValueError(f"Tool '{tool_name}' on server '{server_name}' has no description available")
 
                 details_text = f"Tool: {tool_name} (from {server_name})\n\n"
-                details_text += f"Description: {payload.get('tool_description', 'No description available')}\n\n"
-                details_text += f"Schema:\n{payload.get('tool_schema', 'No schema available')}\n"
+                details_text += f"Description: {tool_info.get('tool_description', 'No description available')}\n\n"
+                details_text += f"Schema:\n{tool_info.get('tool_schema', 'No schema available')}\n"
 
-                guidance_text = "⚠️  IMPORTANT: Review this schema carefully before execution!\n\n"
+                guidance_text = "IMPORTANT: Review this schema carefully before execution!\n\n"
                 guidance_text += "Next steps:\n"
                 guidance_text += f"• Ensure server is running: manage_server('{server_name}', 'start')\n"
                 guidance_text += f"• Execute: execute_tool('{server_name}', '{tool_name}', arguments)\n"
@@ -275,12 +261,7 @@ class MCPServer:
                     content=[
                         TextContent(type="text", text=details_text),
                         TextContent(type="text", text=guidance_text)
-                    ],
-                    meta={
-                        "tool_name": tool_name,
-                        "server_name": server_name,
-                        "tool_info": tool_info
-                    }
+                    ]
                 )
 
             except Exception as e:
@@ -296,13 +277,11 @@ class MCPServer:
             try:
                 match action:
                     case "start":
-                        success = await mcp_engine.start_mcp_server(server_name)
-                        status = "running" if success else "failed"
-                        result_text = f"Server '{server_name}' start {'successful' if success else 'failed'}"
+                        success, message = await mcp_engine.start_mcp_server(server_name)
+                        result_text = f"Server '{server_name}' start {'successful' if success else 'failed' } message : {message}"
                     case "shutdown":
-                        success = await mcp_engine.shutdown_mcp_server(server_name)
-                        status = "shutdown" if success else "failed"
-                        result_text = f"Server '{server_name}' shutdown {'successful' if success else 'failed'}"
+                        success, message = await mcp_engine.shutdown_mcp_server(server_name)
+                        result_text = f"Server '{server_name}' shutdown {'successful' if success else 'failed'} message : {message}"
                     case _:
                         return ToolResult(
                             content=[TextContent(type="text", text=f"Invalid action: {action}. Use 'start' or 'shutdown'.")]
@@ -324,13 +303,7 @@ class MCPServer:
                     content=[
                         TextContent(type="text", text=result_text),
                         TextContent(type="text", text=guidance_text)
-                    ],
-                    meta={
-                        "server_name": server_name,
-                        "action": action,
-                        "success": success,
-                        "status": status
-                    }
+                    ]
                 )
 
             except Exception as e:
@@ -366,11 +339,7 @@ class MCPServer:
                     content=[
                         TextContent(type="text", text=result_text),
                         TextContent(type="text", text=guidance_text)
-                    ],
-                    meta={
-                        "running_servers": running_servers,
-                        "total_running": len(running_servers)
-                    }
+                    ]
                 )
             except Exception as e:
                 return ToolResult(
@@ -381,28 +350,20 @@ class MCPServer:
             name="execute_tool",
             description="Execute a tool on a running MCP server."
         )
-        async def execute_tool(server_name: str, tool_name: str, arguments: dict = None) -> ToolResult:
+        async def execute_tool(server_name: str, tool_name: str, arguments: dict = None, timeout:float=60) -> ToolResult:
             try:
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
                 result = await mcp_engine.execute_tool(
                     server_name=server_name,
                     tool_name=tool_name,
-                    arguments=arguments
+                    arguments=arguments,
+                    timeout=timeout
                 )
-                return ToolResult(
-                    content=result,
-                    meta={
-                        "server_name": server_name,
-                        "tool_name": tool_name,
-                    }
-                )
+                return ToolResult(content=result)
 
             except Exception as e:
                 return ToolResult(
-                    content=[TextContent(type="text", text=f"Execution failed: {str(e)}")],
-                    meta={
-                        "server_name": server_name,
-                        "tool_name": tool_name,
-                        "error": True
-                    }
+                    content=[TextContent(type="text", text=f"Execution failed: {str(e)}")]
                 )
             
