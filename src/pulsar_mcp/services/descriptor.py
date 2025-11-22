@@ -111,16 +111,14 @@ class DescriptorService:
             return
          
         try:
-            async with asyncio.timeout(delay=timeout):
-                async with stdio_client(server=server_parameters) as transport:
-                    read, write = transport 
-                    async with ClientSession(read, write) as session:
+            async with stdio_client(server=server_parameters) as transport:
+                read, write = transport 
+                async with ClientSession(read, write) as session:
+                    async with asyncio.timeout(delay=timeout):
                         await session.initialize()
-                        logger.info("Initialized MCP session")
-                        tools_result = await session.list_tools()
-                        logger.info(f"Retrieved {len(tools_result.tools)} tools from MCP server")
-
-
+                    logger.info("Initialized MCP session")
+                    tools_result = await session.list_tools()
+                    logger.info(f"Retrieved {len(tools_result.tools)} tools from MCP server")
             mcp_description = await self.generate_description(
                 server_name=server_name,
                 tools_result=tools_result
