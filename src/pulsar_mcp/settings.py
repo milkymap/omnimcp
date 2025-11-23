@@ -9,5 +9,10 @@ class ApiKeysSettings(BaseSettings):
     DIMENSIONS:int = Field(1024, validation_alias="DIMENSIONS")
     INDEX_NAME: str = Field("pulsar_idx", validation_alias="INDEX_NAME")
     QDRANT_STORAGE_PATH: str = Field(validation_alias="QDRANT_STORAGE_PATH")
-    THREAD_POOL_MAX_WORKERS:int = Field(32, validation_alias="THREAD_POOL_MAX_WORKERS")
-    MCP_SERVER_STARTUP_TIMEOUT:int = Field(30, validation_alias="MCP_SERVER_STARTUP_TIMEOUT")
+    MCP_SERVER_INDEX_RATE_LIMIT:int = Field(3, validation_alias="MCP_SERVER_INDEX_RATE_LIMIT")
+    MCP_SERVER_TOOL_INDEX_RATE_LIMIT:int = Field(32, validation_alias="MCP_SERVER_TOOL_INDEX_RATE_LIMIT")
+    BACKGROUND_MCP_TOOL_QUEUE_MAX_SUBSCRIBERS:int = Field(8, validation_alias="BACKGROUND_MCP_TOOL_QUEUE_MAX_SUBSCRIBERS")
+    BACKGROUND_MCP_TOOL_QUEUE_SIZE:int = Field(64, validation_alias="BACKGROUND_MCP_TOOL_QUEUE_SIZE")
+    MCP_SERVER_EMBEDDING_WEIGHTS:float= Field(0.1, validation_alias="MCP_SERVER_EMBEDDING_WEIGHTS")
+    MCP_SERVER_POLLING_INTERVAL_MS:int = Field(5000, validation_alias="MCP_SERVER_POLLING_INTERVAL_MS")
+    
