@@ -8,7 +8,10 @@ from typing import List, Dict, Optional, Any, Tuple, Self
 from mcp import StdioServerParameters, ClientSession, stdio_client
 from mcp.types import ListToolsResult
 
-from ..types import McpStartupConfig, McpServerDescription, DescribeMcpServerResponse
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+
+from ..types import McpStartupConfig, McpServerDescription, McpServerFullDescription
 from ..log import logger
 
 class DescriptorService:
@@ -24,7 +27,6 @@ class DescriptorService:
         if exc_type is not None:
             logger.error(f"Exception in EmbeddingService context manager: {exc_value}")
             logger.exception(traceback)
-    
 
     async def tools_to_string(self, tools_results:ListToolsResult) -> str:
         tools = []
@@ -42,6 +44,12 @@ class DescriptorService:
         
         return "\n###\n".join(tools) if tools else "No tools available."
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+        reraise=True
+    )
     async def enhance_query_with_llm(self, query: str) -> str:
         prompt = f"""You are a query enhancement system for semantic tool search.
         Each tool is a function with specific input and output types, a defined process, and a clear purpose.
@@ -71,6 +79,12 @@ class DescriptorService:
         
         return enhanced
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+        reraise=True
+    )
     async def enhance_tool(self, tool_name: str, tool_description: str, tool_schema: Dict[str, Any], server_name: str) -> str:
         system_prompt = """
         Generate a comprehensive tool description for semantic search and retrieval.    
@@ -99,39 +113,30 @@ class DescriptorService:
         
         return completion_response.choices[0].message.content
     
-    async def describe_mcp_server(self, server_name:str, mcp_startup_config:McpStartupConfig, timeout:int=50) -> Optional[DescribeMcpServerResponse]:
-        try:
-            server_parameters = StdioServerParameters(
-                command=mcp_startup_config.command,
-                args=mcp_startup_config.args,
-                env=mcp_startup_config.env
-            )
-        except Exception as e:
-            logger.error(f"Error creating MCP server parameters: {e}")
-            return
-         
-        try:
-            async with stdio_client(server=server_parameters) as transport:
-                read, write = transport 
-                async with ClientSession(read, write) as session:
-                    async with asyncio.timeout(delay=timeout):
-                        await session.initialize()
-                    logger.info("Initialized MCP session")
-                    tools_result = await session.list_tools()
-                    logger.info(f"Retrieved {len(tools_result.tools)} tools from MCP server")
-            mcp_description = await self.generate_description(
-                server_name=server_name,
-                tools_result=tools_result
-            )
-            return mcp_description
-        except asyncio.TimeoutError:
-            logger.error("Timeout while trying to describe MCP server.") 
-        except Exception as e:
-            logger.error(f"Error describing MCP server: {e}")
-        
-        return 
+    async def describe_mcp_server(self, server_name:str, mcp_startup_config:McpStartupConfig, timeout:int=50) -> McpServerFullDescription:
+        server_parameters = StdioServerParameters(
+            command=mcp_startup_config.command,
+            args=mcp_startup_config.args,
+            env=mcp_startup_config.env
+        )
+        async with stdio_client(server=server_parameters) as transport:
+            read, write = transport 
+            async with ClientSession(read, write) as session:
+                async with asyncio.timeout(delay=timeout):
+                    await session.initialize()
+                logger.info("Initialized MCP session")
+                tools_result = await session.list_tools()
+                logger.info(f"Retrieved {len(tools_result.tools)} tools from MCP server")
+        mcp_description = await self.generate_description(server_name=server_name, tools_result=tools_result)
+        return mcp_description
     
-    async def generate_description(self, server_name:str, tools_result:ListToolsResult) -> DescribeMcpServerResponse:
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+        reraise=True
+    )
+    async def generate_description(self, server_name:str, tools_result:ListToolsResult) -> McpServerFullDescription:
         tools = await self.tools_to_string(tools_result)
 
         system_prompt = """
@@ -160,7 +165,7 @@ class DescriptorService:
         )
 
         server_descripton:McpServerDescription = completion_response.choices[0].message.parsed
-        return DescribeMcpServerResponse(
+        return McpServerFullDescription(
             server_name=server_name,
             server_description=server_descripton,
             tools=tools_result
