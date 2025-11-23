@@ -24,6 +24,10 @@ from .types import McpConfig, McpStartupConfig, McpServerFullDescription
 
 from .log import logger
 
+"""
+2025-11-23 22:39:59,731 - pulsar_mcp - mcp_engine.py - 139 - ERROR - Failed to index server 'Time': unhandled errors in a TaskGroup (1 sub-exception)
+"""
+
 class MCPEngine:
     def __init__(self, api_keys_settings:ApiKeysSettings):
         self.api_keys_settings = api_keys_settings
@@ -50,6 +54,10 @@ class MCPEngine:
         self.index_service = await self.resources_manager.enter_async_context(index_service)
         self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
         self.descriptor_service = await self.resources_manager.enter_async_context(descriptor_service)
+
+        for _ in range(self.api_keys_settings.BACKGROUND_MCP_TOOL_QUEUE_MAX_SUBSCRIBERS):
+            task = asyncio.create_task(self.subscriber())
+            self.subscriber_tasks.add(task)
 
         return self
 
@@ -238,6 +246,7 @@ class MCPEngine:
         raise Exception(f"Aborted indexing tools from server '{server_name}' due to errors")
     
     async def subscriber(self):
+        logger.info("Starting background MCP tool subscriber")
         while True:
             try:
                 task = await self.priority_queue.get()
