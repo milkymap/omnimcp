@@ -13,7 +13,10 @@ from dotenv import load_dotenv
     required=True,
     help='Path to the MCP server configuration file(Claude Code JSON Format).'
 )
-def main(mcp_config_filepath:str) -> None:
+@click.option("--transport", type=click.Choice(["stdio", "http"]), default="stdio", help="Transport method to communicate with MCP server.")
+@click.option("--host", type=str, default="localhost", help="Host for HTTP transport (if applicable).")
+@click.option("--port", type=int, default=8000, help="Port for HTTP transport (if applicable).")
+def main(mcp_config_filepath:str, transport:str, host:str, port:int) -> None:
     load_dotenv()
     api_keys_settings = ApiKeysSettings() # Load settings to ensure environment variables are read
     print(api_keys_settings)
@@ -23,7 +26,11 @@ def main(mcp_config_filepath:str) -> None:
             api_keys_settings=api_keys_settings,
             mcp_config_filepath=mcp_config_filepath
         )
-        await mcp_server.run_server()
+        await mcp_server.run_server(
+            transport=transport,
+            host=host,
+            port=port
+        )
     
     asyncio.run(async_main())
         
