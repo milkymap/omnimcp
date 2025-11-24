@@ -3,7 +3,10 @@ import click
 
 from pulsar_mcp.log import logger
 from pulsar_mcp.settings import ApiKeysSettings
+from pulsar_mcp.mcp_engine import MCPEngine
 from pulsar_mcp.mcp_server import MCPServer
+
+from pulsar_mcp.utilities import load_mcp_config
 from dotenv import load_dotenv
 
 @click.command()
@@ -19,18 +22,23 @@ from dotenv import load_dotenv
 def main(mcp_config_filepath:str, transport:str, host:str, port:int) -> None:
     load_dotenv()
     api_keys_settings = ApiKeysSettings() # Load settings to ensure environment variables are read
-    print(api_keys_settings)
+    mcp_config = load_mcp_config(mcp_config_filepath)  # Validate config file early
+
     async def async_main():
         logger.info("pulsar_mcp main function called.")
-        mcp_server = MCPServer(
+        
+        async with MCPEngine(
             api_keys_settings=api_keys_settings,
-            mcp_config_filepath=mcp_config_filepath
-        )
-        await mcp_server.run_server(
-            transport=transport,
-            host=host,
-            port=port
-        )
-    
+            mcp_config=mcp_config
+        ) as mcp_engine:
+            await mcp_engine.index_mcp_servers()
+            logger.info("MCP Engine initialized successfully.")
+            mcp_server = MCPServer(mcp_engine=mcp_engine)
+            await mcp_server.run_server(
+                transport=transport,
+                host=host,
+                port=port
+            )
+        
     asyncio.run(async_main())
         
