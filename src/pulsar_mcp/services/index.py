@@ -7,7 +7,7 @@ from qdrant_client import AsyncQdrantClient, models
 
 
 from ..log import logger
-from ..types import McpServerDescription
+from ..types import McpServerDescription, McpServerToolDescription
 
 class IndexService:
     def __init__(self, index_name:str, dimensions:int, qdrant_storage_path:str):
@@ -53,7 +53,7 @@ class IndexService:
             ]
         )
     
-    async def add_tool(self, server_name, tool_name:str, tool_description:str, tool_schema:Dict[str, Any], embedding:List[float]):
+    async def add_tool(self, server_name, tool_name:str, tool_description:str, tool_schema:Dict[str, Any], embedding:List[float], enhanced_tool:McpServerToolDescription):
         tool_id = f"{server_name}::{tool_name}"
         await self.client.upsert(
             collection_name=self.index_name,
@@ -64,6 +64,9 @@ class IndexService:
                     payload={
                         "type": "tool",
                         "server_name": server_name,
+                        "title": enhanced_tool.title,
+                        "summary": enhanced_tool.summary,
+                        "utterances": enhanced_tool.uttirances,
                         "tool_name": tool_name,
                         "tool_description": tool_description,
                         "tool_schema": tool_schema
@@ -81,12 +84,10 @@ class IndexService:
             with_vectors=False
         )
         if not result or len(result) == 0:
-            return None
+            return None 
         return result[0].payload
         
     async def get_tool(self, server_name:str, tool_name:str) -> Optional[Dict[str, Any]]:
-        await self.get_server(server_name)  # Ensure server exists
-
         tool_id = str(uuid5(namespace=NAMESPACE_DNS, name=f"{server_name}::{tool_name}"))
         result = await self.client.retrieve(
             collection_name=self.index_name,
@@ -101,7 +102,7 @@ class IndexService:
     async def delete_server(self, server_name:str) -> Dict[str, Any]:
         server_id = str(uuid5(namespace=NAMESPACE_DNS, name=server_name))
         server_data = await self.get_server(server_name)
-        
+ 
         nb_components = server_data.get("nb_tools", 0) 
         
         if nb_components == 0:
@@ -135,7 +136,9 @@ class IndexService:
         
         await self.client.delete(
             collection_name=self.index_name,
-            points_selector=models.PointIdsList(points=[point.id for point in records] + [server_id])
+            points_selector=models.PointIdsList(
+                points=[point.id for point in records] + [server_id]
+            )
         )
         
         return server_data
@@ -206,36 +209,8 @@ class IndexService:
             result.append(point.payload)
         
         return result, next_point_id
-    
-    async def nb_servers(self):
-        count_result = await self.client.count(
-            collection_name=self.index_name,
-            count_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="type",
-                        match=models.MatchValue(value="server")
-                    )
-                ]
-            )
-        )
-        return count_result.count
 
-    async def nb_tools(self):
-        count_result = await self.client.count(
-            collection_name=self.index_name,
-            count_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="type",
-                        match=models.MatchValue(value="tool")
-                    )
-                ]
-            )
-        )
-        return count_result.count
-
-    async def list_tools(self, server_name: str, limit: int = 100, offset: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    async def list_tools(self, server_name: str, limit: int = 20, offset: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Optional[str]]:
         await self.get_server(server_name)  # Ensure server exists
 
         scroll_result = await self.client.scroll(
@@ -264,4 +239,33 @@ class IndexService:
             result.append(point.payload)
 
         return result, next_point_id
+
+        
+    async def nb_servers(self):
+        count_result = await self.client.count(
+            collection_name=self.index_name,
+            count_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="type",
+                        match=models.MatchValue(value="server")
+                    )
+                ]
+            )
+        )
+        return count_result.count
+
+    async def nb_tools(self):
+        count_result = await self.client.count(
+            collection_name=self.index_name,
+            count_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="type",
+                        match=models.MatchValue(value="tool")
+                    )
+                ]
+            )
+        )
+        return count_result.count
         
