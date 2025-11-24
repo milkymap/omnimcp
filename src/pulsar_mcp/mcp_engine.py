@@ -12,28 +12,24 @@ from typing import Self, Dict, Optional, Set, Tuple, List, AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from pathlib import Path
 
-
 from mcp import StdioServerParameters, ClientSession, stdio_client
-from mcp.types import Tool, ContentBlock
+from mcp.types import Tool, ContentBlock, ListToolsResult
 
 from .settings import ApiKeysSettings
 from .services.embedding import EmbeddingService
 from .services.descriptor import DescriptorService
 from .services.index import IndexService
-from .types import McpConfig, McpStartupConfig, McpServerFullDescription
+from .types import McpServersConfig, McpStartupConfig, McpServerDescription, McpServerToolDescription
+from .utilities import retrieve_mcp_server_tool
 
 from .log import logger
 
-"""
-2025-11-23 22:39:59,731 - pulsar_mcp - mcp_engine.py - 139 - ERROR - Failed to index server 'Time': unhandled errors in a TaskGroup (1 sub-exception)
-"""
-
 class MCPEngine:
-    def __init__(self, api_keys_settings:ApiKeysSettings):
+    def __init__(self, api_keys_settings:ApiKeysSettings, mcp_config:McpServersConfig):
         self.api_keys_settings = api_keys_settings
+        self.mcp_config = mcp_config
         
     async def __aenter__(self) -> Self:
-        self.mcp_config: Optional[McpConfig] = None
         
         self.mcp_server_tasks:Dict[str, asyncio.Task] = {}
         self.subscriber_tasks:Set[asyncio.Task] = set()
@@ -93,20 +89,7 @@ class MCPEngine:
 
         self.ctx.term()
         await self.resources_manager.aclose()
-        
-    def load_mcp_config(self, mcp_config_filepath: str) -> McpConfig:
-        try:
-            config_path = Path(mcp_config_filepath)
-            if not config_path.exists():
-                raise FileNotFoundError(f"MCP config file not found: {mcp_config_filepath}")
-
-            with open(config_path, 'r') as f:
-                config_data = json.load(f)
-            self.mcp_config = McpConfig(**config_data)
-        except Exception as e:
-            logger.error(f"Error loading MCP config from {mcp_config_filepath}: {e}")
-            raise e 
-    
+            
     @asynccontextmanager
     async def create_socket(self, socket_type:int, socket_method:str, addr:str) -> AsyncGenerator[azmq.Socket, None]:
         if socket_method not in ["bind", "connect"]:
@@ -124,127 +107,121 @@ class MCPEngine:
             socket.close(linger=0)
             logger.info(f"Closed socket with method {socket_method}")
 
-    async def index_mcp_servers(self) -> None:
-        if not hasattr(self, 'mcp_config') or self.mcp_config is None:
-            raise Exception("MCP config not loaded. Please load the MCP config before indexing servers.")
-        
+    async def index_mcp_servers(self) -> None:   
         logger.info(f"Starting indexing of {len(self.mcp_config.mcpServers)} MCP servers")
-        tasks = []
+        tasks:List[asyncio.Task] = []
         for server_name, startup_config in self.mcp_config.mcpServers.items():
-            task = asyncio.create_task(self.index_single_server(server_name, startup_config))
+            server_info = await self.index_service.get_server(server_name=server_name)  # Preload server to check existence
+            if server_info is not None and not startup_config.reindex:    
+                logger.info(f"Server '{server_name}' already indexed and reindex not requested. Skipping.")
+                continue
+            
+            task = asyncio.create_task(
+                self.protected_index_single_mcp_server(server_name, startup_config)
+            )
+            task.set_name(f"INDEX_TASK_{server_name}")
             tasks.append(task)
+            
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        server_names = list(self.mcp_config.mcpServers.keys())
         nb_failures = 0
-        for i, result in enumerate(results):
+        for task, result in zip(tasks, results):
+            server_name = task.get_name().replace("INDEX_TASK_", "")
             if not isinstance(result, Exception):
-                logger.info(f"Successfully indexed server '{server_names[i]}'")
+                logger.info(f"Successfully indexed server '{server_name}' with {result} tools")
                 continue 
-            logger.error(f"Failed to index server '{server_names[i]}': {result}")
+            logger.error(f"Failed to index server '{server_name}': {result}")
             nb_failures += 1
-        logger.info(f"Completed indexing MCP servers with {nb_failures} failures out of {len(self.mcp_config.mcpServers)} servers")
+        logger.info(f"Completed indexing MCP servers with {nb_failures} failures out of {len(tasks)} servers to index")
         if nb_failures == len(self.mcp_config.mcpServers):
             raise Exception("All MCP server indexing attempts failed")
-
-    async def index_single_server(self, server_name: str, startup_config: McpStartupConfig) -> None:
-        existing_server = await self.index_service.get_server(server_name)
-        if existing_server is not None and not startup_config.force_reindex:
-            logger.info(f"Server '{server_name}' already indexed, skipping")
-            return
-        logger.info(f"Describing MCP server: {server_name}")
+    
+    async def protected_index_single_mcp_server(self, server_name: str, startup_config: McpStartupConfig) -> int:
         await self.mcp_server_semaphore.acquire()
         try:
-            server_response:McpServerFullDescription = await self.descriptor_service.describe_mcp_server(
-                server_name=server_name,
-                mcp_startup_config=startup_config,
-                timeout=startup_config.timeout
-            )
-            
-            description_text = (
-                f"{server_response.server_description.title}\n"
-                f"{server_response.server_description.summary}\n"
-                f"Capabilities: {', '.join(server_response.server_description.capabilities)}\n"
-                f"Limitations: {', '.join(server_response.server_description.limitations)}"
-            )
-            server_embedding = await self.embedding_service.create_embedding([description_text])
-            # if one tool fails, we want to abort the whole server indexing
-            await self.index_server_tools(server_response, server_embedding[0])  
-            nb_tools = len(server_response.tools.tools)
-            await self.index_service.add_server(
-                server_name=server_name,
-                mcp_server_description=server_response.server_description,
-                embedding=server_embedding[0],
-                nb_tools=nb_tools
-            )
-
-            logger.info(f"Indexed server: {server_name}")
+            nb_tools = await self.index_single_mcp_server(server_name, startup_config)
+            return nb_tools
         finally:
             self.mcp_server_semaphore.release()
 
-    async def index_single_tool(self, server_name: str, tool:Tool, server_embedding: list[float], barrier:asyncio.Barrier) -> None:
-        await self.mcp_server_tool_semaphore.acquire()
-        try:  
-            enhanced_description = await self.descriptor_service.enhance_tool(
-                server_name=server_name,
-                tool_name=tool.name,
-                tool_description=tool.description or "",
-                tool_schema=tool.inputSchema
-            )
-            tool_embedding = await self.embedding_service.create_embedding([enhanced_description])
-            weighted_embedding = self.embedding_service.weighted_embedding(
-                base_embedding=server_embedding,
-                corpus_embeddings=tool_embedding[0],
-                alpha=self.api_keys_settings.MCP_SERVER_EMBEDDING_WEIGHTS
-            )
-            logger.info(f"Prepared to index tool: {tool.name} from server '{server_name}', waiting at barrier...")
-            await barrier.wait()  # synchronize before indexing: this will prevent to add the tool if another tool failed
-            await self.index_service.add_tool(
-                server_name=server_name,
-                tool_name=tool.name,
-                tool_description=enhanced_description,
-                tool_schema=tool.inputSchema,
-                embedding=weighted_embedding
-            )
-            logger.debug(f"Indexed tool: {tool.name} from server '{server_name}'")
-        finally:
-            self.mcp_server_tool_semaphore.release()
-            logger.info(f"Released semaphore for tool: {tool.name} from server '{server_name}'")
-
-    async def index_server_tools(self, server_response:McpServerFullDescription, server_embedding: list[float]) -> None:
-        server_name = server_response.server_name
-        tools = server_response.tools.tools
-
-        logger.info(f"Indexing {len(tools)} tools from server '{server_name}'")
-
-        barrier = asyncio.Barrier(parties=len(tools))
+    async def index_single_mcp_server(self, server_name: str, startup_config: McpStartupConfig) -> int:    
+        logger.info(f"Indexing MCP server: {server_name}")
+        
+        tools:ListToolsResult = await retrieve_mcp_server_tool(
+            server_name=server_name,
+            mcp_startup_config=startup_config,
+        )
+        nb_tools = len(tools.tools)
         tasks:List[asyncio.Task] = []
-        for tool in tools:
-            task = asyncio.create_task(self.index_single_tool(server_name, tool, server_embedding, barrier))
-            task.set_name(f"INDEX_TOOL_{server_name}_{tool.name}")
-            tasks.append(task)
+        for tool in tools.tools:
+            tasks.append(
+                self.descriptor_service.describe_mcp_server_tool(
+                    server_name=server_name,
+                    tool_name=tool.name,
+                    tool_description=tool.description or "",
+                    tool_schema=tool.inputSchema
+                ) 
+            ) 
         
-        logger.info(f"server : {server_name}, waiting for tools to be indexed...")
-        kill_all_tasks = False
-        
-        for completed_task in asyncio.as_completed(tasks):
-            try:
-                await completed_task
-            except Exception as e:
-                logger.error(f"Error indexing tool from server '{server_name}': {e}")
-                kill_all_tasks = True
+        enhanced_tools:List[McpServerToolDescription | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
+        exception_encountered = False
+        for i, res in enumerate(enhanced_tools):
+            if isinstance(res, Exception):
+                logger.error(f"Error describing tool '{tools.tools[i].name}' from server '{server_name}': {res}")
+                exception_encountered = True
                 break 
-
-        if not kill_all_tasks:
-            logger.info(f"Completed indexing tools from server '{server_name}'")
-            return
         
-        logger.warning(f"Errors occurred during tool indexing for server {server_name}, aborting remaining tasks")
-        for task in tasks:
-            if not task.done():
-                task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        raise Exception(f"Aborted indexing tools from server '{server_name}' due to errors")
-    
+        if exception_encountered:
+            raise Exception(f"Failed to describe all tools from server '{server_name}'")
+        
+        server_description:McpServerDescription = await self.descriptor_service.describe_mcp_server(
+            server_name=server_name,
+            enhanced_tools=enhanced_tools,
+        )
+        texts:List[str] = []
+        
+        texts.append(
+            f"{server_description.title}\n"
+            f"{server_description.summary}\n"
+            f"Capabilities: {', '.join(server_description.capabilities)}\n"
+            f"Limitations: {', '.join(server_description.limitations)}"
+        )
+        for tool_desc in enhanced_tools:
+            text = (
+                f"{tool_desc.title}\n"
+                f"{tool_desc.summary}\n"
+                f"Example Utterances: {', '.join(tool_desc.uttirances)}"
+            )
+            texts.append(text)
+        
+        embeddings = await self.embedding_service.create_embedding(texts=texts)
+        server_embedding, *tool_embeddings = embeddings
+        enhanced_tool_embeddings = self.embedding_service.inject_base_into_corpus(
+            base_embedding=server_embedding,
+            corpus_embeddings=tool_embeddings,
+            alpha=self.api_keys_settings.MCP_SERVER_EMBEDDING_WEIGHTS
+        )
+
+        tasks:List[asyncio.Task] = []
+        for tool, enhanced_tool, tool_embedding in zip(tools.tools, enhanced_tools, enhanced_tool_embeddings):
+            tasks.append(
+                self.index_service.add_tool(
+                    server_name=server_name,
+                    tool_name=tool.name,
+                    tool_description=tool.description,
+                    tool_schema=tool.inputSchema,
+                    enhanced_tool=enhanced_tool,
+                    embedding=tool_embedding
+                )
+            )
+        await asyncio.gather(*tasks) 
+        await self.index_service.add_server(
+            server_name=server_name,
+            mcp_server_description=server_description,
+            embedding=server_embedding,
+            nb_tools=nb_tools 
+        )
+        return nb_tools
+
     async def subscriber(self):
         logger.info("Starting background MCP tool subscriber")
         while True:
@@ -413,7 +390,6 @@ class MCPEngine:
         logger.error(f"MCP server task for '{server_name}' terminated during startup with error: {error}")
         return False, f"Failed to start MCP server task for '{server_name}': {error}"
     
-    
     async def shutdown_mcp_server(self, server_name: str) -> Tuple[bool, Optional[str]]:
         task = self.mcp_server_tasks.get(server_name)
         if not task:
@@ -494,5 +470,5 @@ class MCPEngine:
             return False, None, str(e)
     
     def list_running_servers(self) -> list:
-        return list(self.mcp_server_tasks.keys())
-        
+        running_server_names = list(self.mcp_server_tasks.keys())
+        return running_server_names
