@@ -157,6 +157,8 @@ class IndexService:
                 )
             )
         if scope is not None and len(scope) > 0:
+            # scope value must be one of tool, prompt, resources  
+            # only tool is implemented for now
             query_filter.append(
                 models.FieldCondition(
                     key="type",
@@ -186,17 +188,26 @@ class IndexService:
         
         return result
     
-    async def list_servers(self, limit:int=100, offset:Optional[str]=None) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    async def list_servers(self, limit:int=100, offset:Optional[str]=None, ignore_servers:Optional[List[str]]=None) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        scroll_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="type",
+                    match=models.MatchValue(value="server")
+                )
+            ]
+        )
+        if ignore_servers is not None and len(ignore_servers) > 0:
+            scroll_filter.must_not = [
+                models.FieldCondition(
+                    key="server_name",
+                    match=models.MatchAny(any=ignore_servers)
+                )
+            ]
+
         scroll_result = await self.client.scroll(
             collection_name=self.index_name,
-            scroll_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="type",
-                        match=models.MatchValue(value="server")
-                    )
-                ]
-            ),
+            scroll_filter=scroll_filter,
             with_payload=True,
             with_vectors=False,
             limit=limit,
@@ -211,8 +222,6 @@ class IndexService:
         return result, next_point_id
 
     async def list_tools(self, server_name: str, limit: int = 20, offset: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-        await self.get_server(server_name)  # Ensure server exists
-
         scroll_result = await self.client.scroll(
             collection_name=self.index_name,
             scroll_filter=models.Filter(
@@ -241,31 +250,48 @@ class IndexService:
         return result, next_point_id
 
         
-    async def nb_servers(self):
+    async def nb_servers(self, ignore_servers:Optional[List[str]]=None):
+        count_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="type",
+                    match=models.MatchValue(value="server")
+                )
+            ]
+        )
+        if ignore_servers is not None and len(ignore_servers) > 0:
+            count_filter.must_not = [
+                models.FieldCondition(
+                    key="server_name",
+                    match=models.MatchAny(any=ignore_servers)
+                )
+            ]
+
         count_result = await self.client.count(
             collection_name=self.index_name,
-            count_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="type",
-                        match=models.MatchValue(value="server")
-                    )
-                ]
-            )
+            count_filter=count_filter
         )
         return count_result.count
 
-    async def nb_tools(self):
+    async def nb_tools(self, ignore_servers:Optional[List[str]]=None):
+        count_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="type",
+                    match=models.MatchValue(value="tool")
+                )
+            ]
+        )
+        if ignore_servers is not None and len(ignore_servers) > 0:
+            count_filter.must_not = [
+                models.FieldCondition(
+                    key="server_name",
+                    match=models.MatchAny(any=ignore_servers)
+                )
+            ]
         count_result = await self.client.count(
             collection_name=self.index_name,
-            count_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="type",
-                        match=models.MatchValue(value="tool")
-                    )
-                ]
-            )
+            count_filter=count_filter
         )
         return count_result.count
         
