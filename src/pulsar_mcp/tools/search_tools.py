@@ -32,7 +32,7 @@ class SearchTools:
             minimal_results = []
             for result in all_results:
                 payload = result.get('payload', {})
-                if payload.get('type') == 'server':  # next time remove this 
+                if payload.get('type') == 'server':
                     minimal_results.append({
                         "type": "server",
                         "server_name": payload.get('server_name'),
@@ -40,12 +40,15 @@ class SearchTools:
                         "score": result.get('score', 0)
                     })
                 elif payload.get('type') == 'tool':
+                    srv_name = payload.get('server_name')
+                    tl_name = payload.get('tool_name')
                     minimal_results.append({
                         "type": "tool",
-                        "server_name": payload.get('server_name'),
-                        "tool_name": payload.get('tool_name'),
+                        "server_name": srv_name,
+                        "tool_name": tl_name,
                         "title": payload.get('title'),
-                        "score": result.get('score', 0)
+                        "score": result.get('score', 0),
+                        "blocked": self.mcp_engine.is_tool_blocked(srv_name, tl_name)
                     })
 
             result_text = f"Found {len(minimal_results)} results for query: '{query}'"

@@ -527,4 +527,11 @@ class MCPEngine:
             return False
 
         return tool_name in startup_config.blocked_tools
+
+    def is_server_ignored(self, server_name:str) -> bool:
+        if not self.mcp_config or server_name not in self.mcp_config.mcpServers:
+            return False
+
+        startup_config = self.mcp_config.mcpServers[server_name]
+        return startup_config.ignore
         

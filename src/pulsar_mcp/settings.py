@@ -17,7 +17,7 @@ class ApiKeysSettings(BaseSettings):
     MCP_SERVER_POLLING_INTERVAL_MS:int = Field(5000, validation_alias="MCP_SERVER_POLLING_INTERVAL_MS")
     # Content manager settings
     CONTENT_STORAGE_PATH: str = Field(validation_alias="CONTENT_STORAGE_PATH")
-    MAX_RESULT_TOKENS: int = Field(2000, validation_alias="MAX_RESULT_TOKENS")
+    MAX_RESULT_TOKENS: int = Field(5000, validation_alias="MAX_RESULT_TOKENS")
     DESCRIBE_IMAGES: bool = Field(True, validation_alias="DESCRIBE_IMAGES")
     VISION_MODEL_NAME: str = Field("gpt-4.1-mini", validation_alias="VISION_MODEL_NAME")
     

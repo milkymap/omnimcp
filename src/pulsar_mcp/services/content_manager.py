@@ -145,7 +145,7 @@ class ContentManager:
                     "content": [
                         {
                             "type": "text",
-                            "text": "Describe this image concisely in 1-2 sentences. Focus on key visual elements and purpose."
+                            "text": "Describe this image concisely 5-10 sentences. Focus on key visual elements and purpose."
                         },
                         {
                             "type": "image_url",
@@ -153,7 +153,7 @@ class ContentManager:
                         }
                     ]
                 }],
-                max_tokens=150
+                max_tokens=512
             )
             return response.choices[0].message.content.strip()
         except Exception as e:

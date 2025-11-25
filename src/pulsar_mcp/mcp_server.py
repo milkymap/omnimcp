@@ -217,9 +217,9 @@ class MCPServer:
                         if target_servers is not None and len(target_servers) > 0:
                             server_names = target_servers
                         
-                        if len(set(server_names).intersection(set(self.ignore_servers))) > 0:
+                        if len(set(server_names).intersection(set(self.ignore_servers or []))) > 0:
                             return ToolResult(
-                                content=[TextContent(type="text", text=f"Error: Some servers in 'targetèservers' are set to be ignored: {self.ignore_servers}")]
+                                content=[TextContent(type="text", text=f"Error: Some servers in 'target_servers' are set to be ignored: {self.ignore_servers}")]
                             )
                         
                         if server_names is None or len(server_names) == 0:

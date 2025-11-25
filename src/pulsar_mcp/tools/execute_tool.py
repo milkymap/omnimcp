@@ -15,6 +15,11 @@ class ExecuteToolTool:
     async def execute_tool(self, server_name: str, tool_name: str, arguments: dict = None,
                           timeout: float = 60, in_background: bool = False, priority: int = 1) -> ToolResult:
         try:
+            if self.mcp_engine.is_server_ignored(server_name):
+                return ToolResult(
+                    content=[TextContent(type="text", text=f"Error: Server '{server_name}' is ignored and cannot be accessed")]
+                )
+
             if isinstance(arguments, str):
                 arguments = json.loads(arguments)
 

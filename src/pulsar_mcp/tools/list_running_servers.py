@@ -17,7 +17,6 @@ class ListRunningServersTool:
             if not running_servers:
                 result_text = "No MCP servers are currently running."
                 guidance = "Next steps:\n"
-                #guidance += "• Use list_indexed_servers() to see available servers\n"
                 guidance += "• Use manage_server(server_name, 'start') to start a server\n"
                 guidance += "• Servers must be running before you can execute tools"
             else:

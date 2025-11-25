@@ -14,6 +14,11 @@ class ListServerToolsTool:
 
     async def list_server_tools(self, server_name: str, limit: int = 50, offset: Optional[str] = None) -> ToolResult:
         try:
+            if self.mcp_engine.is_server_ignored(server_name):
+                return ToolResult(
+                    content=[TextContent(type="text", text=f"Error: Server '{server_name}' is ignored and cannot be accessed")]
+                )
+
             tools, offset = await self.mcp_engine.index_service.list_tools(
                 server_name=server_name,
             )
@@ -24,12 +29,14 @@ class ListServerToolsTool:
 
             content = []
             for payload in tools:
+                tool_name = payload.get('tool_name')
                 content.append(
                     TextContent(
                         type="text",
                         text=json.dumps({
-                            "tool_name": payload.get('tool_name'),
-                            "title": payload.get('title')
+                            "tool_name": tool_name,
+                            "title": payload.get('title'),
+                            "blocked": self.mcp_engine.is_tool_blocked(server_name, tool_name)
                         })
                     )
                 )

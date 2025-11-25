@@ -12,6 +12,11 @@ class ManageServerTool:
 
     async def manage_server(self, server_name: str, action: str) -> ToolResult:
         try:
+            if self.mcp_engine.is_server_ignored(server_name):
+                return ToolResult(
+                    content=[TextContent(type="text", text=f"Error: Server '{server_name}' is ignored and cannot be accessed")]
+                )
+
             match action:
                 case "start":
                     success, message = await self.mcp_engine.start_mcp_server(server_name)

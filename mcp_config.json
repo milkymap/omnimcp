@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "server_000": {
+      "command": "uvc|npx",
+      "args": ["array", "of", "arguments"],
+      "env": {
+        "ENV_VAR_1": "value1",
+        "ENV_VAR_2": "value2"
+      }
+    }
+  }
+}
