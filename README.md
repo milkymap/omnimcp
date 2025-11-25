@@ -178,6 +178,24 @@ This is an enhanced schema of Claude Desktop's MCP configuration with additional
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {"GITHUB_TOKEN": "..."},
       "blocked_tools": ["delete_repository", "fork_repository"]  // indexed but execution blocked
+    },
+    "elevenlabs": {
+      "command": "uvx",
+      "args": ["elevenlabs-mcp"],
+      "env": {"ELEVENLABS_API_KEY": "..."},
+      "hints": [
+        "when user asks you to generate audio: speech or music, use background mode task",
+        "proactively play audio with the elevenLabs-mcp tool when relevant"
+      ]
+    },
+    "exa": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.exa.ai/mcp"],
+      "env": {"EXA_API_KEY": "..."},
+      "hints": [
+        "always execute in background mode",
+        "can fire up multiple exa tool calls in parallel to gather information"
+      ]
     }
   }
 }
@@ -191,7 +209,7 @@ This is an enhanced schema of Claude Desktop's MCP configuration with additional
 | `args` | array | Command-line arguments passed to the executable |
 | `env` | object | Environment variables for this MCP server |
 | `timeout` | number | Seconds to wait for server startup (default: 30.0) |
-| `hints` | array | Keywords to help semantic search discover this server |
+| `hints` | array | **Powerful!** Guide the LLM on how to use this server. Used for both discovery and execution instructions. Examples: "always use background mode", "can fire multiple calls in parallel", "requires authentication" |
 | `blocked_tools` | array | Tool names that will be indexed but blocked from execution |
 | `ignore` | boolean | If true, skip indexing this server entirely (default: false) |
 | `overwrite` | boolean | If true, force re-index even if already indexed (default: false) |
