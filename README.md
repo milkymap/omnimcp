@@ -27,14 +27,36 @@ MCP tool definitions consume tokens fast. A typical setup:
 
 That's **60K+ tokens** before the conversation starts. Add more servers and you're competing with your actual context.
 
+### Why this matters
+
+**Context bloat kills performance.** When tool definitions consume 50-100K tokens, you're left with limited space for actual conversation, documents, and reasoning. The model spends attention on tool schemas instead of your task.
+
+**More tools = more hallucinations.** With 50+ similar tools (like `notification-send-user` vs `notification-send-channel`), models pick wrong tools and hallucinate parameters. Tool selection accuracy drops as the toolset grows.
+
+**Dynamic tool loading breaks caching.** Loading tools on-demand during inference seems smart, but it invalidates prompt caches. Every new tool added mid-conversation means reprocessing the entire context. Your "optimization" becomes a performance tax.
+
+**Tool results bloat context too.** A single file read can return 50K tokens. An image is 1K+ tokens base64-encoded. These pile up in conversation history, pushing out earlier context.
+
 ## The Solution
 
-Pulsar loads tools on-demand through semantic search. Instead of stuffing all schemas upfront:
+Pulsar exposes a **single `semantic_router` tool** as the only entry point to your entire MCP ecosystem. The LLM never sees individual tool definitions—just one unified interface.
 
-1. **Semantic search** → Find relevant tools by intent, not name
-2. **Lazy server loading** → Start servers only when needed
-3. **Progressive schema loading** → Fetch full details only before execution
-4. **Content offloading** → Chunk large results, describe images, store for retrieval
+```
+Traditional: 58 tools → 55K tokens in tool definitions
+Pulsar:      1 tool   → ~500 tokens (semantic_router)
+```
+
+**How it works:**
+
+1. **Semantic search** → Find relevant tools by intent, not name. Tools are pre-indexed with embeddings, searched at runtime, returned as text results (not tool definitions)
+2. **Lazy server loading** → Servers start only when needed, shutdown when done
+3. **Progressive schema loading** → Full JSON schema fetched only before execution, returned as text in conversation
+4. **Content offloading** → Large results chunked, images described, stored for retrieval
+
+**Key insight:** Tool schemas appear in conversation text, not in tool definitions. This means:
+- Prompt caching stays intact (tool definition never changes)
+- Only relevant schemas enter context (via search results)
+- No hallucination from similar tool names (model sees 3-5 tools, not 50+)
 
 From ~60K tokens to ~3K. Access to everything, cost of almost nothing.
 
