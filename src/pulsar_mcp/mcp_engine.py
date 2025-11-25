@@ -52,13 +52,16 @@ class MCPEngine:
             self.descriptor_service = await self.resources_manager.enter_async_context(descriptor_service)
 
         else:
-            # Serve mode: needs ZMQ, content manager, subscribers
+            # Serve mode: needs embedding (for search), ZMQ, content manager, subscribers
             self.mcp_server_tasks:Dict[str, asyncio.Task] = {}
             self.subscriber_tasks:Set[asyncio.Task] = set()
             self.background_tasks:Dict[str, asyncio.Task] = {}
 
             self.ctx = azmq.Context()
             self.priority_queue = asyncio.PriorityQueue(maxsize=self.api_keys_settings.BACKGROUND_MCP_TOOL_QUEUE_SIZE)
+
+            embedding_service = EmbeddingService(api_key=self.api_keys_settings.OPENAI_API_KEY, embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME, dimension=self.api_keys_settings.DIMENSIONS)
+            self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
 
             content_manager = ContentManager(
                 storage_path=self.api_keys_settings.CONTENT_STORAGE_PATH,
