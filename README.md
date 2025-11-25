@@ -196,7 +196,7 @@ export CONTENT_STORAGE_PATH="/path/to/content"
 **3. Index your servers** (recommended before serving):
 
 ```bash
-pulsar-mcp index --config mcp-servers.json
+uvx pulsar-mcp index --config mcp-servers.json
 ```
 
 **4. Run the server**:
@@ -229,7 +229,7 @@ uvx pulsar-mcp serve --config mcp-servers.json --transport http --host 0.0.0.0 -
 
 **Example with [mcp-remote](https://www.npmjs.com/package/mcp-remote)**:
 ```bash
-npm i mcp-remote
+npm install mcp-remote
 ```
 
 ```json

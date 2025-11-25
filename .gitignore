@@ -11,3 +11,4 @@ wheels/
 .env
 .claude
 mcp-servers.json
+*.mp4
