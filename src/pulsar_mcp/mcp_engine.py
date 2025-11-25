@@ -40,28 +40,24 @@ class MCPEngine:
         index_service = IndexService(index_name=self.api_keys_settings.INDEX_NAME, dimensions=self.api_keys_settings.DIMENSIONS, qdrant_storage_path=self.api_keys_settings.QDRANT_STORAGE_PATH)
         self.index_service = await self.resources_manager.enter_async_context(index_service)
 
-        if self.mode == "index":
-            # Index mode: only needs embedding and descriptor services
-            self.mcp_server_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_INDEX_RATE_LIMIT)
-            self.mcp_server_tool_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_TOOL_INDEX_RATE_LIMIT)
+        # Shared services for indexing and search
+        self.mcp_server_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_INDEX_RATE_LIMIT)
+        self.mcp_server_tool_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_TOOL_INDEX_RATE_LIMIT)
 
-            embedding_service = EmbeddingService(api_key=self.api_keys_settings.OPENAI_API_KEY, embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME, dimension=self.api_keys_settings.DIMENSIONS)
-            descriptor_service = DescriptorService(openai_api_key=self.api_keys_settings.OPENAI_API_KEY, openai_model_name=self.api_keys_settings.DESCRIPTOR_MODEL_NAME)
+        embedding_service = EmbeddingService(api_key=self.api_keys_settings.OPENAI_API_KEY, embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME, dimension=self.api_keys_settings.DIMENSIONS)
+        descriptor_service = DescriptorService(openai_api_key=self.api_keys_settings.OPENAI_API_KEY, openai_model_name=self.api_keys_settings.DESCRIPTOR_MODEL_NAME)
 
-            self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
-            self.descriptor_service = await self.resources_manager.enter_async_context(descriptor_service)
+        self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
+        self.descriptor_service = await self.resources_manager.enter_async_context(descriptor_service)
 
-        else:
-            # Serve mode: needs embedding (for search), ZMQ, content manager, subscribers
+        if self.mode == "serve":
+            # Serve mode: additionally needs ZMQ, content manager, subscribers
             self.mcp_server_tasks:Dict[str, asyncio.Task] = {}
             self.subscriber_tasks:Set[asyncio.Task] = set()
             self.background_tasks:Dict[str, asyncio.Task] = {}
 
             self.ctx = azmq.Context()
             self.priority_queue = asyncio.PriorityQueue(maxsize=self.api_keys_settings.BACKGROUND_MCP_TOOL_QUEUE_SIZE)
-
-            embedding_service = EmbeddingService(api_key=self.api_keys_settings.OPENAI_API_KEY, embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME, dimension=self.api_keys_settings.DIMENSIONS)
-            self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
 
             content_manager = ContentManager(
                 storage_path=self.api_keys_settings.CONTENT_STORAGE_PATH,
