@@ -1,14 +1,15 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 
+
 class McpStartupConfig(BaseModel):
     command:str
     args: list[str] = Field(default_factory=list)
     env: Dict[str, str] = Field(default_factory=dict)
     timeout:float=30.0
-    include_tools:Optional[List[str]] = None
-    exclude_tools:Optional[List[str]] = None
-    reindex:bool = False
+    overwrite:bool = False # if true, re-index even if already indexed
+    ignore:bool = False  # do not index this, or if exists, filter out during search. has more priority than overwrite
+    hints:Optional[List[str]]=None
 
 class McpServersConfig(BaseModel):
     mcpServers: Dict[str, McpStartupConfig]
