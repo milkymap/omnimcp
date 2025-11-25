@@ -64,6 +64,84 @@ Pulsar:      1 tool   → ~500 tokens (semantic_router)
 
 From ~60K tokens to ~3K. Access to everything, cost of almost nothing.
 
+## Architecture: Meta-Tool Pattern
+
+Pulsar uses the **meta-tool pattern**, similar to Claude Code's Agent Skills system. Instead of exposing dozens of individual tools, it exposes a single `semantic_router` meta-tool that acts as a gateway to your entire MCP ecosystem.
+
+### How It Works
+
+**Traditional MCP approach:**
+```
+tools: [
+  {name: "github_create_issue", description: "..."},
+  {name: "github_create_pr", description: "..."},
+  {name: "filesystem_read", description: "..."},
+  // ... 50+ more tools
+]
+```
+❌ Problems: Context bloat, tool hallucination, no caching
+
+**Pulsar's meta-tool approach:**
+```json
+{
+  "tools": [
+    {
+      "name": "semantic_router",
+      "description": "Universal gateway to MCP ecosystem...\n
+        OPERATIONS: search_tools, get_server_info, execute_tool...\n
+        LIST OF INDEXED SERVERS:\n
+        filesystem: 8 tools (file operations, read/write)\n
+        github: 35 tools (issues, PRs, repos)\n
+        ...",
+      "input_schema": {
+        "operation": "search_tools | execute_tool | ..."
+      }
+    }
+  ]
+}
+```
+✅ Benefits: Single tool definition, server list in description, dynamic discovery
+
+### Parallel to Claude Skills
+
+Claude Skills and Pulsar share the same architectural insight:
+
+| Aspect | Claude Skills | Pulsar MCP |
+|--------|--------------|------------|
+| **Meta-tool** | `Skill` tool | `semantic_router` tool |
+| **Discovery** | Skill descriptions in tool description | Server list + hints in tool description |
+| **Invocation** | `Skill(command="skill-name")` | `semantic_router(operation="execute_tool", server_name=...)` |
+| **Context injection** | Skill instructions loaded on invocation | Tool schemas fetched on-demand, returned as text |
+| **Cache-friendly** | Tool definition never changes | Tool definition never changes |
+| **Dynamic list** | `<available_skills>` section | `LIST OF INDEXED SERVERS` section |
+| **Behavioral hints** | Skill descriptions guide LLM | Server `hints` field guides LLM |
+
+**Key insight:** Both systems inject instructions through **prompt expansion** rather than traditional function calling. The tool description becomes a dynamic directory that the LLM reads and reasons about, while actual execution details are loaded lazily.
+
+**Example of behavioral guidance:**
+
+Claude Skills:
+```
+<available_skills>
+  skill-creator: "When user wants to create a new skill..."
+  internal-comms: "When user wants to write internal communications..."
+</available_skills>
+```
+
+Pulsar `hints`:
+```json
+{
+  "elevenlabs": {
+    "hints": [
+      "when user asks to generate audio: speech or music, use background mode",
+      "proactively play audio when relevant"
+    ]
+  }
+}
+```
+
+Both inject **behavioral instructions** that shape how the LLM uses the tools, not just what they do.
+
 ## Real-World Example
 
 **Multi-server orchestration in action:**
