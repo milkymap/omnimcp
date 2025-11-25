@@ -115,8 +115,8 @@ Pulsar requires several environment variables to operate. You must configure the
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `OPENAI_API_KEY` | OpenAI API key for embeddings and descriptions | `sk-proj-...` |
-| `QDRANT_STORAGE_PATH` | Path to local directory for embedded Qdrant vector database (no separate server needed) | `/home/user/qdrant_data` |
-| `CONTENT_STORAGE_PATH` | Path for storing offloaded content (large results, images) | `/home/user/content_storage` |
+| `QDRANT_STORAGE_PATH` | Path to local directory for embedded Qdrant vector database (no separate server needed) | `/path/to/qdrant_data` |
+| `CONTENT_STORAGE_PATH` | Path for storing offloaded content (large results, images) | `/path/to/content_storage` |
 
 **Optional variables (with defaults):**
 
@@ -134,16 +134,16 @@ Pulsar requires several environment variables to operate. You must configure the
 **Option 1: Export directly**
 ```bash
 export OPENAI_API_KEY="sk-proj-..."
-export QDRANT_STORAGE_PATH="/home/user/qdrant_data"
-export CONTENT_STORAGE_PATH="/home/user/content_storage"
+export QDRANT_STORAGE_PATH="/path/to/qdrant_data"
+export CONTENT_STORAGE_PATH="/path/to/content_storage"
 ```
 
 **Option 2: Create a `.env` file**
 ```bash
 # .env
 OPENAI_API_KEY=sk-proj-...
-QDRANT_STORAGE_PATH=/home/user/qdrant_data
-CONTENT_STORAGE_PATH=/home/user/content_storage
+QDRANT_STORAGE_PATH=/path/to/qdrant_data
+CONTENT_STORAGE_PATH=/path/to/content_storage
 ```
 
 Then source it before running commands:
@@ -163,7 +163,7 @@ uvx pulsar-mcp index --config mcp-servers.json
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user"],
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/directory"],
       "hints": ["file operations", "read write files"]
     },
     "github": {
