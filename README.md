@@ -133,8 +133,8 @@ Pulsar `hints`:
 {
   "elevenlabs": {
     "hints": [
-      "when user asks to generate audio: speech or music, use background mode",
-      "proactively play audio when relevant"
+      "When the user requests audio generation (speech or music), always execute in background mode",
+      "Proactively offer to play audio using the ElevenLabs tool when contextually relevant"
     ]
   }
 }
@@ -262,8 +262,8 @@ This is an enhanced schema of Claude Desktop's MCP configuration with additional
       "args": ["elevenlabs-mcp"],
       "env": {"ELEVENLABS_API_KEY": "..."},
       "hints": [
-        "when user asks you to generate audio: speech or music, use background mode task",
-        "proactively play audio with the elevenLabs-mcp tool when relevant"
+        "When the user requests audio generation (speech or music), always execute in background mode",
+        "Proactively offer to play audio using the ElevenLabs tool when contextually relevant"
       ]
     },
     "exa": {
@@ -271,8 +271,8 @@ This is an enhanced schema of Claude Desktop's MCP configuration with additional
       "args": ["-y", "mcp-remote", "https://mcp.exa.ai/mcp"],
       "env": {"EXA_API_KEY": "..."},
       "hints": [
-        "always execute in background mode",
-        "can fire up multiple exa tool calls in parallel to gather information"
+        "Always execute web searches in background mode to avoid blocking the conversation",
+        "Multiple Exa tool calls can be fired in parallel to efficiently gather information from different sources"
       ]
     }
   }
@@ -287,7 +287,7 @@ This is an enhanced schema of Claude Desktop's MCP configuration with additional
 | `args` | array | Command-line arguments passed to the executable |
 | `env` | object | Environment variables for this MCP server |
 | `timeout` | number | Seconds to wait for server startup (default: 30.0) |
-| `hints` | array | **Powerful!** Guide the LLM on how to use this server. Used for both discovery and execution instructions. Examples: "always use background mode", "can fire multiple calls in parallel", "requires authentication" |
+| `hints` | array | **Powerful!** Guide the LLM on how to use this server. Used for both discovery and execution instructions. Examples: "Always execute in background mode", "Multiple calls can be fired in parallel", "Proactively offer when contextually relevant" |
 | `blocked_tools` | array | Tool names that will be indexed but blocked from execution |
 | `ignore` | boolean | If true, skip indexing this server entirely (default: false) |
 | `overwrite` | boolean | If true, force re-index even if already indexed (default: false) |
