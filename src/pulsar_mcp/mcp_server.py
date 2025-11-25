@@ -14,7 +14,8 @@ from .log import logger
 from .tools import (
     SearchTools, GetServerInfoTool,
     ListServerToolsTool, GetToolDetailsTool, ManageServerTool,
-    ListRunningServersTool, ExecuteToolTool, PollTaskResultTool
+    ListRunningServersTool, ExecuteToolTool, PollTaskResultTool,
+    GetContentTool
 )
 
 
@@ -88,6 +89,7 @@ class MCPServer:
         self.manage_server = ManageServerTool(self.mcp_engine)
         self.list_running_servers = ListRunningServersTool(self.mcp_engine)
         self.poll_task_result = PollTaskResultTool(self.mcp_engine)
+        self.get_content = GetContentTool(self.mcp_engine.content_manager)
 
     def define_semantic_router(self, mcp:FastMCP, additional_msg:str):
         @mcp.tool(
@@ -130,6 +132,11 @@ class MCPServer:
             Required: task_id
             Check status and retrieve results of background tasks
 
+            - get_content
+            Required: ref_id
+            Optional: chunk_index
+            Retrieve offloaded content (large text chunks, images, audio) by reference ID
+
             WORKFLOW (UPDATED):
             1. Discovery:
             search_tools → get_server_info (optional) → list_server_tools (optional)
@@ -151,6 +158,7 @@ class MCPServer:
             7 CHECK server capabilities with get_server_info to understand limitations before heavy usage
             8 FOR search: write clear, descriptive queries with full context (e.g., "tools for reading PDF documents ...query can be very detailed" not just "PDF"). If your query is vague or short, set enhanced=True to trigger LLM-powered query enhancement for better results
             9 ONLY 'operation' parameter is required. Other parameters depend on the chosen operation.
+            10 WHEN tool results show [Reference: ref_id], use get_content to retrieve full content. For chunked text, use chunk_index to get specific chunks.
             
             -----------------------
             LIST OF INDEXED SERVERS
@@ -162,13 +170,14 @@ class MCPServer:
             operation: Annotated[
                 Literal[
                     "search_tools",
-                    "get_server_info", 
+                    "get_server_info",
                     "list_server_tools",
                     "get_tool_details",
                     "manage_server",
                     "list_running_servers",
                     "execute_tool",
-                    "poll_task_result"
+                    "poll_task_result",
+                    "get_content"
                 ],
                 "The operation to perform in the MCP ecosystem"
             ],
@@ -191,7 +200,10 @@ class MCPServer:
             in_background: Annotated[bool, "Execute tool asynchronously and return task ID immediately (default: False)"] = False,
             priority: Annotated[int, "Background task priority, lower numbers run first (default: 1)"] = 1,
             # Background task parameters
-            task_id: Annotated[str, "Task identifier for polling background execution status"] = None,    
+            task_id: Annotated[str, "Task identifier for polling background execution status"] = None,
+            # Content retrieval parameters
+            ref_id: Annotated[str, "Reference ID for retrieving offloaded content"] = None,
+            chunk_index: Annotated[int, "Specific chunk index to retrieve (for large text content)"] = None,    
         ) -> ToolResult:
             try:
                 match operation:
@@ -284,10 +296,17 @@ class MCPServer:
                                 content=[TextContent(type="text", text="Error: 'task_id' is required for poll_task_result")]
                             )
                         return await self.poll_task_result(task_id=task_id)
-                    
+
+                    case "get_content":
+                        if ref_id is None:
+                            return ToolResult(
+                                content=[TextContent(type="text", text="Error: 'ref_id' is required for get_content")]
+                            )
+                        return await self.get_content(ref_id=ref_id, chunk_index=chunk_index)
+
                     case _:
                         return ToolResult(
-                            content=[TextContent(type="text", text=f"Unknown action: {action}")]
+                            content=[TextContent(type="text", text=f"Unknown operation: {operation}")]
                         )
                         
             except Exception as e:
