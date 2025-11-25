@@ -16,7 +16,7 @@ class IndexService:
         self.qdrant_storage_path = qdrant_storage_path
         
     async def __aenter__(self):
-        self.client = AsyncQdrantClient(url="http://localhost:6333")
+        self.client = AsyncQdrantClient(path=self.qdrant_storage_path)
         if not await self.client.collection_exists(collection_name=self.index_name):
             await self.client.create_collection(
                 collection_name=self.index_name,

@@ -115,7 +115,7 @@ Pulsar requires several environment variables to operate. You must configure the
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `OPENAI_API_KEY` | OpenAI API key for embeddings and descriptions | `sk-proj-...` |
-| `QDRANT_STORAGE_PATH` | Path to Qdrant vector database storage | `/home/user/qdrant_data` |
+| `QDRANT_STORAGE_PATH` | Path to local directory for embedded Qdrant vector database (no separate server needed) | `/home/user/qdrant_data` |
 | `CONTENT_STORAGE_PATH` | Path for storing offloaded content (large results, images) | `/home/user/content_storage` |
 
 **Optional variables (with defaults):**

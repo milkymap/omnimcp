@@ -48,7 +48,7 @@ def index(config: str) -> None:
     required=True,
     help='Path to the MCP server configuration file.'
 )
-@click.option("--transport", type=click.Choice(["stdio", "http"]), default="stdio", help="Transport method.")
+@click.option("--transport", type=click.Choice(["stdio", "http"]), default="http", help="Transport method.")
 @click.option("--host", type=str, default="localhost", help="Host for HTTP transport.")
 @click.option("--port", type=int, default=8000, help="Port for HTTP transport.")
 def serve(config: str, transport: str, host: str, port: int) -> None:
