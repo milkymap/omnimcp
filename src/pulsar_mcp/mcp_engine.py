@@ -534,4 +534,11 @@ class MCPEngine:
 
         startup_config = self.mcp_config.mcpServers[server_name]
         return startup_config.ignore
+
+    def get_blocked_tools(self, server_name:str) -> Optional[List[str]]:
+        if not self.mcp_config or server_name not in self.mcp_config.mcpServers:
+            return None
+
+        startup_config = self.mcp_config.mcpServers[server_name]
+        return startup_config.blocked_tools
         

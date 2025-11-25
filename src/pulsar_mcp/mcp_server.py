@@ -65,13 +65,17 @@ class MCPServer:
         assert offset is None, "Offset should be None when fetching all servers"
         indexed_servers = []
         for payload in servers:
+            server_name = payload.get('server_name')
             item = {
-                "server_name": payload.get('server_name'),
+                "server_name": server_name,
                 "title": payload.get('title'),
                 "nb_tools": payload.get('nb_tools', 0)
             }
-            hints = self.mcp_engine.get_server_hints(item['server_name'])
-            if hints is not None:
+            blocked_tools = self.mcp_engine.get_blocked_tools(server_name)
+            if blocked_tools:
+                item['blocked_tools'] = blocked_tools
+            hints = self.mcp_engine.get_server_hints(server_name)
+            if hints:
                 item['hints'] = hints
             indexed_servers.append(yaml.dump(item, sort_keys=False))
         additional_msg = "\n###\n".join(indexed_servers)
@@ -156,10 +160,18 @@ class MCPServer:
             5 USE scope parameter in search to filter for 'tool', 'prompt' or 'resources' type for better results. Only 'tool' is supported right now.
             6 FOR background tasks: always save the task_id and poll with poll_task_result to get results
             7 CHECK server capabilities with get_server_info to understand limitations before heavy usage
-            8 FOR search: write clear, descriptive queries with full context (e.g., "tools for reading PDF documents ...query can be very detailed" not just "PDF"). If your query is vague or short, set enhanced=True to trigger LLM-powered query enhancement for better results
+            8 FOR search: write clear, descriptive queries with full context (e.g., "tools for reading PDF documents ...query can be very detailed" not just "PDF"). If your query is vague or
+            short, set enhanced=True to trigger LLM-powered query enhancement for better results
             9 ONLY 'operation' parameter is required. Other parameters depend on the chosen operation.
             10 WHEN tool results show [Reference: ref_id], use get_content to retrieve full content. For chunked text, use chunk_index to get specific chunks.
-            
+
+            ACCESS CONTROL:
+            - IGNORED SERVERS: Some servers may be ignored by the administrator. They will not appear in search results and all operations (list_server_tools, get_tool_details, 
+            manage_server, execute_tool) will return an error.
+            - BLOCKED TOOLS: Some tools may be blocked on specific servers. They will appear in search_tools and list_server_tools results with "blocked": true flag. Do NOT attempt to
+            execute blocked tools - execution will fail.
+            - ALWAYS check the "blocked" field in search/list results before attempting execution.
+
             -----------------------
             LIST OF INDEXED SERVERS
             -----------------------
