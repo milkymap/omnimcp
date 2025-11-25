@@ -8,15 +8,16 @@ from .manage_server import ManageServerTool
 from .list_running_servers import ListRunningServersTool
 from .execute_tool import ExecuteToolTool
 from .poll_task_result import PollTaskResultTool
+from .get_content import GetContentTool
 
 __all__ = [
     "SearchTools",
     "GetServerInfoTool",
-    "ListIndexedServersTool",
     "ListServerToolsTool",
     "GetToolDetailsTool",
     "ManageServerTool",
     "ListRunningServersTool",
     "ExecuteToolTool",
-    "PollTaskResultTool"
+    "PollTaskResultTool",
+    "GetContentTool"
 ]
