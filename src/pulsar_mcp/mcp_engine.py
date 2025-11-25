@@ -28,42 +28,50 @@ from .utilities import retrieve_mcp_server_tool
 from .log import logger
 
 class MCPEngine:
-    def __init__(self, api_keys_settings:ApiKeysSettings, mcp_config:McpServersConfig):
+    def __init__(self, api_keys_settings:ApiKeysSettings, mcp_config:McpServersConfig, mode:str="serve"):
         self.api_keys_settings = api_keys_settings
         self.mcp_config = mcp_config
-        
-    async def __aenter__(self) -> Self:
-        self.mcp_server_tasks:Dict[str, asyncio.Task] = {}
-        self.subscriber_tasks:Set[asyncio.Task] = set()
-        self.background_tasks:Dict[str, asyncio.Task] = {}
+        self.mode = mode  # "index" or "serve"
 
-        self.ctx = azmq.Context()
+    async def __aenter__(self) -> Self:
         self.resources_manager = AsyncExitStack()
 
-        self.mcp_server_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_INDEX_RATE_LIMIT)
-        self.mcp_server_tool_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_TOOL_INDEX_RATE_LIMIT)
-        
-        self.priority_queue = asyncio.PriorityQueue(maxsize=self.api_keys_settings.BACKGROUND_MCP_TOOL_QUEUE_SIZE)
-    
+        # Shared services (needed for both index and serve)
         index_service = IndexService(index_name=self.api_keys_settings.INDEX_NAME, dimensions=self.api_keys_settings.DIMENSIONS, qdrant_storage_path=self.api_keys_settings.QDRANT_STORAGE_PATH)
-        embedding_service = EmbeddingService(api_key=self.api_keys_settings.OPENAI_API_KEY, embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME, dimension=self.api_keys_settings.DIMENSIONS)
-        descriptor_service = DescriptorService(openai_api_key=self.api_keys_settings.OPENAI_API_KEY, openai_model_name=self.api_keys_settings.DESCRIPTOR_MODEL_NAME)
-        content_manager = ContentManager(
-            storage_path=self.api_keys_settings.CONTENT_STORAGE_PATH,
-            openai_api_key=self.api_keys_settings.OPENAI_API_KEY,
-            max_tokens=self.api_keys_settings.MAX_RESULT_TOKENS,
-            describe_images=self.api_keys_settings.DESCRIBE_IMAGES,
-            vision_model=self.api_keys_settings.VISION_MODEL_NAME
-        )
-
         self.index_service = await self.resources_manager.enter_async_context(index_service)
-        self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
-        self.descriptor_service = await self.resources_manager.enter_async_context(descriptor_service)
-        self.content_manager = await self.resources_manager.enter_async_context(content_manager)
 
-        for _ in range(self.api_keys_settings.BACKGROUND_MCP_TOOL_QUEUE_MAX_SUBSCRIBERS):
-            task = asyncio.create_task(self.subscriber())
-            self.subscriber_tasks.add(task)
+        if self.mode == "index":
+            # Index mode: only needs embedding and descriptor services
+            self.mcp_server_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_INDEX_RATE_LIMIT)
+            self.mcp_server_tool_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_TOOL_INDEX_RATE_LIMIT)
+
+            embedding_service = EmbeddingService(api_key=self.api_keys_settings.OPENAI_API_KEY, embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME, dimension=self.api_keys_settings.DIMENSIONS)
+            descriptor_service = DescriptorService(openai_api_key=self.api_keys_settings.OPENAI_API_KEY, openai_model_name=self.api_keys_settings.DESCRIPTOR_MODEL_NAME)
+
+            self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
+            self.descriptor_service = await self.resources_manager.enter_async_context(descriptor_service)
+
+        else:
+            # Serve mode: needs ZMQ, content manager, subscribers
+            self.mcp_server_tasks:Dict[str, asyncio.Task] = {}
+            self.subscriber_tasks:Set[asyncio.Task] = set()
+            self.background_tasks:Dict[str, asyncio.Task] = {}
+
+            self.ctx = azmq.Context()
+            self.priority_queue = asyncio.PriorityQueue(maxsize=self.api_keys_settings.BACKGROUND_MCP_TOOL_QUEUE_SIZE)
+
+            content_manager = ContentManager(
+                storage_path=self.api_keys_settings.CONTENT_STORAGE_PATH,
+                openai_api_key=self.api_keys_settings.OPENAI_API_KEY,
+                max_tokens=self.api_keys_settings.MAX_RESULT_TOKENS,
+                describe_images=self.api_keys_settings.DESCRIBE_IMAGES,
+                vision_model=self.api_keys_settings.VISION_MODEL_NAME
+            )
+            self.content_manager = await self.resources_manager.enter_async_context(content_manager)
+
+            for _ in range(self.api_keys_settings.BACKGROUND_MCP_TOOL_QUEUE_MAX_SUBSCRIBERS):
+                task = asyncio.create_task(self.subscriber())
+                self.subscriber_tasks.add(task)
 
         return self
 
@@ -71,33 +79,34 @@ class MCPEngine:
         if exc_type is not None:
             logger.error(f"Exception in APIEngine context manager: {exc_value}")
             logger.exception(traceback)
-        
-        cancelled_tasks:List[asyncio.Task] = []
-        for server_name, task in self.mcp_server_tasks.items():
-            logger.info(f"Cancelling background MCP server task for: {server_name}")
-            if not task.done():
-                task.cancel()
-                cancelled_tasks.append(task)
-        await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
-        cancelled_tasks.clear()
-        for task in self.subscriber_tasks:
-            logger.info("Cancelling background MCP tool subscriber task")
-            if not task.done():
-                task.cancel()
-                cancelled_tasks.append(task)
-        
-        await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+        if self.mode == "serve":
+            cancelled_tasks:List[asyncio.Task] = []
+            for server_name, task in self.mcp_server_tasks.items():
+                logger.info(f"Cancelling background MCP server task for: {server_name}")
+                if not task.done():
+                    task.cancel()
+                    cancelled_tasks.append(task)
+            await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
-        cancelled_tasks.clear()
-        for task_id, task in self.background_tasks.items():
-            logger.info(f"Cancelling background MCP tool task with ID: {task_id}")
-            if not task.done():
-                task.cancel()
-                cancelled_tasks.append(task)
-        await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+            cancelled_tasks.clear()
+            for task in self.subscriber_tasks:
+                logger.info("Cancelling background MCP tool subscriber task")
+                if not task.done():
+                    task.cancel()
+                    cancelled_tasks.append(task)
+            await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
-        self.ctx.term()
+            cancelled_tasks.clear()
+            for task_id, task in self.background_tasks.items():
+                logger.info(f"Cancelling background MCP tool task with ID: {task_id}")
+                if not task.done():
+                    task.cancel()
+                    cancelled_tasks.append(task)
+            await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+
+            self.ctx.term()
+
         await self.resources_manager.aclose()
             
     @asynccontextmanager
