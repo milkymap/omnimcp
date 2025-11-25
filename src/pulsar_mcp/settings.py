@@ -15,4 +15,9 @@ class ApiKeysSettings(BaseSettings):
     BACKGROUND_MCP_TOOL_QUEUE_SIZE:int = Field(64, validation_alias="BACKGROUND_MCP_TOOL_QUEUE_SIZE")
     MCP_SERVER_EMBEDDING_WEIGHTS:float= Field(0.1, validation_alias="MCP_SERVER_EMBEDDING_WEIGHTS")
     MCP_SERVER_POLLING_INTERVAL_MS:int = Field(5000, validation_alias="MCP_SERVER_POLLING_INTERVAL_MS")
+    # Content manager settings
+    CONTENT_STORAGE_PATH: str = Field(validation_alias="CONTENT_STORAGE_PATH")
+    MAX_RESULT_TOKENS: int = Field(2000, validation_alias="MAX_RESULT_TOKENS")
+    DESCRIBE_IMAGES: bool = Field(True, validation_alias="DESCRIBE_IMAGES")
+    VISION_MODEL_NAME: str = Field("gpt-4.1-mini", validation_alias="VISION_MODEL_NAME")
     
