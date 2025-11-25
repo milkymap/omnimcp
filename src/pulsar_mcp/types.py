@@ -10,6 +10,7 @@ class McpStartupConfig(BaseModel):
     overwrite:bool = False # if true, re-index even if already indexed
     ignore:bool = False  # do not index this, or if exists, filter out during search. has more priority than overwrite
     hints:Optional[List[str]]=None
+    blocked_tools:Optional[List[str]]=None  # tools that cannot be executed at runtime
 
 class McpServersConfig(BaseModel):
     mcpServers: Dict[str, McpStartupConfig]

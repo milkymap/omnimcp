@@ -428,7 +428,10 @@ class MCPEngine:
     async def execute_tool(self, server_name: str, tool_name: str, arguments: Optional[dict]=None, timeout:float=60, priority:int=1, in_background:bool=False) -> List[ContentBlock]:
         if not server_name in self.mcp_server_tasks:
             raise Exception(f"Server '{server_name}' not running")
-        
+
+        if self.is_tool_blocked(server_name, tool_name):
+            raise Exception(f"Tool '{tool_name}' is blocked on server '{server_name}'")
+
         task = self.mcp_server_tasks[server_name]
         task_name = task.get_name()
         _, _, _, status = task_name.split("_")
@@ -491,8 +494,18 @@ class MCPEngine:
     
     def get_server_hints(self, server_name:str) -> Optional[str]:
         if not self.mcp_config or server_name not in self.mcp_config.mcpServers:
-            return None 
-        
+            return None
+
         startup_config = self.mcp_config.mcpServers[server_name]
         return startup_config.hints
+
+    def is_tool_blocked(self, server_name:str, tool_name:str) -> bool:
+        if not self.mcp_config or server_name not in self.mcp_config.mcpServers:
+            return False
+
+        startup_config = self.mcp_config.mcpServers[server_name]
+        if not startup_config.blocked_tools:
+            return False
+
+        return tool_name in startup_config.blocked_tools
         
