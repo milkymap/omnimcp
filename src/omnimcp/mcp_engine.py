@@ -3,12 +3,12 @@ import asyncio
 
 from uuid import uuid4
 
-import zmq 
-import zmq.asyncio as azmq 
+import zmq
+import zmq.asyncio as azmq
 
 from hashlib import sha256
 
-from typing import Self, Dict, Optional, Set, Tuple, List, AsyncGenerator 
+from typing import Self, Dict, Optional, Set, Tuple, List, AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from pathlib import Path
 
@@ -125,39 +125,49 @@ class MCPEngine:
             socket.close(linger=0)
             logger.info(f"Closed socket with method {socket_method}")
 
-    async def index_mcp_servers(self) -> None:   
+    async def index_mcp_servers(self) -> None:
         logger.info(f"Starting indexing of {len(self.mcp_config.mcpServers)} MCP servers")
-        tasks:List[asyncio.Task] = []
+
+        tasks: List[asyncio.Task] = []
         for server_name, startup_config in self.mcp_config.mcpServers.items():
             if startup_config.ignore:
-                logger.info(f"Server '{server_name}' is marked to be ignored. Skipping indexing.")
-                continue
-            
-            server_info = await self.index_service.get_server(server_name=server_name)  # Preload server to check existence
-            if server_info is not None and not startup_config.overwrite:    
-                logger.info(f"Server '{server_name}' already indexed and reindex not requested. Skipping.")
+                logger.info(f"[{server_name}] Skipping (ignored)")
                 continue
 
-            
+            server_info = await self.index_service.get_server(server_name=server_name)
+            if server_info is not None and not startup_config.overwrite:
+                logger.info(f"[{server_name}] Skipping (already indexed)")
+                continue
+
             task = asyncio.create_task(
                 self.protected_index_single_mcp_server(server_name, startup_config)
             )
             task.set_name(f"INDEX_TASK_{server_name}")
             tasks.append(task)
-            
+
+        if not tasks:
+            logger.info("No servers to index")
+            return
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        nb_success = 0
         nb_failures = 0
+        total_tools = 0
         for task, result in zip(tasks, results):
             server_name = task.get_name().replace("INDEX_TASK_", "")
             if not isinstance(result, Exception):
-                logger.info(f"Successfully indexed server '{server_name}' with {result} tools")
-                continue 
-            logger.error(f"Failed to index server '{server_name}': {result}")
-            nb_failures += 1
-        logger.info(f"Completed indexing MCP servers with {nb_failures} failures out of {len(tasks)} servers to index")
-        if nb_failures == len(self.mcp_config.mcpServers):
+                nb_success += 1
+                total_tools += result
+            else:
+                logger.error(f"[{server_name}] Failed: {result}")
+                nb_failures += 1
+
+        logger.info(f"Indexing complete: {nb_success} servers, {total_tools} tools indexed, {nb_failures} failures")
+
+        if nb_failures == len(tasks):
             raise Exception("All MCP server indexing attempts failed")
-    
+
     async def protected_index_single_mcp_server(self, server_name: str, startup_config: McpStartupConfig) -> int:
         await self.mcp_server_semaphore.acquire()
         try:
@@ -166,15 +176,18 @@ class MCPEngine:
         finally:
             self.mcp_server_semaphore.release()
 
-    async def index_single_mcp_server(self, server_name: str, startup_config: McpStartupConfig) -> int:    
-        logger.info(f"Indexing MCP server: {server_name}")
-        
-        tools:ListToolsResult = await retrieve_mcp_server_tool(
+    async def index_single_mcp_server(self, server_name: str, startup_config: McpStartupConfig) -> int:
+        logger.info(f"[{server_name}] Discovering tools...")
+
+        tools: ListToolsResult = await retrieve_mcp_server_tool(
             server_name=server_name,
             mcp_startup_config=startup_config,
         )
         nb_tools = len(tools.tools)
-        tasks:List[asyncio.Task] = []
+        logger.info(f"[{server_name}] Found {nb_tools} tools")
+
+        logger.info(f"[{server_name}] Generating tool descriptions...")
+        tasks: List[asyncio.Task] = []
         for tool in tools.tools:
             tasks.append(
                 self.descriptor_service.describe_mcp_server_tool(
@@ -182,26 +195,28 @@ class MCPEngine:
                     tool_name=tool.name,
                     tool_description=tool.description or "",
                     tool_schema=tool.inputSchema
-                ) 
-            ) 
-        
-        enhanced_tools:List[McpServerToolDescription | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
+                )
+            )
+
+        enhanced_tools: List[McpServerToolDescription | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
         exception_encountered = False
         for i, res in enumerate(enhanced_tools):
             if isinstance(res, Exception):
-                logger.error(f"Error describing tool '{tools.tools[i].name}' from server '{server_name}': {res}")
+                logger.error(f"[{server_name}] Error describing tool '{tools.tools[i].name}': {res}")
                 exception_encountered = True
-                break 
-        
+                break
+
         if exception_encountered:
             raise Exception(f"Failed to describe all tools from server '{server_name}'")
-        
-        server_description:McpServerDescription = await self.descriptor_service.describe_mcp_server(
+
+        logger.info(f"[{server_name}] Generating server description...")
+        server_description: McpServerDescription = await self.descriptor_service.describe_mcp_server(
             server_name=server_name,
             enhanced_tools=enhanced_tools,
         )
-        texts:List[str] = []
-        
+
+        logger.info(f"[{server_name}] Creating embeddings...")
+        texts: List[str] = []
         texts.append(
             f"{server_description.title}\n"
             f"{server_description.summary}\n"
@@ -215,7 +230,7 @@ class MCPEngine:
                 f"Example Utterances: {', '.join(tool_desc.utterances)}"
             )
             texts.append(text)
-        
+
         embeddings = await self.embedding_service.create_embedding(texts=texts)
         server_embedding, *tool_embeddings = embeddings
         enhanced_tool_embeddings = self.embedding_service.inject_base_into_corpus(
@@ -224,7 +239,8 @@ class MCPEngine:
             alpha=self.api_keys_settings.MCP_SERVER_EMBEDDING_WEIGHTS
         )
 
-        tasks:List[asyncio.Task] = []
+        logger.info(f"[{server_name}] Indexing {nb_tools} tools...")
+        tasks: List[asyncio.Task] = []
         for tool, enhanced_tool, tool_embedding in zip(tools.tools, enhanced_tools, enhanced_tool_embeddings):
             tasks.append(
                 self.index_service.add_tool(
@@ -236,13 +252,16 @@ class MCPEngine:
                     embedding=tool_embedding
                 )
             )
-        await asyncio.gather(*tasks) 
+        await asyncio.gather(*tasks)
+
         await self.index_service.add_server(
             server_name=server_name,
             mcp_server_description=server_description,
             embedding=server_embedding,
-            nb_tools=nb_tools 
+            nb_tools=nb_tools
         )
+
+        logger.info(f"[{server_name}] Done ({nb_tools} tools)")
         return nb_tools
 
     async def subscriber(self):
