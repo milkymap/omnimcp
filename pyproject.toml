@@ -5,7 +5,7 @@ description = "Semantic router for MCP ecosystems - Discover and execute tools a
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "BA Ibrahima", email = "ibrahima.ba@ouest-france.fr" }
+    { name = "BA Ibrahima", email = "ibrahima.elmokhtar@gmail.com" }
 ]
 requires-python = ">=3.12"
 keywords = ["mcp", "model-context-protocol", "semantic-search", "llm", "ai-agents", "tool-routing", "omnimcp"]
