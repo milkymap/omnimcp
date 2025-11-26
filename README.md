@@ -68,6 +68,9 @@ From ~60K tokens to ~3K. Access to everything, cost of almost nothing.
 
 Pulsar uses the **meta-tool pattern**, similar to Claude Code's Agent Skills system. Instead of exposing dozens of individual tools, it exposes a single `semantic_router` meta-tool that acts as a gateway to your entire MCP ecosystem.
 
+### 
+![alt text](pulsar_paradigm.jpeg)
+
 ### How It Works
 
 **Traditional MCP approach:**
