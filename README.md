@@ -68,8 +68,12 @@ From ~60K tokens to ~3K. Access to everything, cost of almost nothing.
 
 OmniMCP uses the **meta-tool pattern**, similar to Claude Code's Agent Skills system. Instead of exposing dozens of individual tools, it exposes a single `semantic_router` meta-tool that acts as a gateway to your entire MCP ecosystem.
 
-### 
-![alt text](pulsar_paradigm.jpeg)
+### Progressive Disclosure Workflow
+![alt text](omnimcp_tool_search.jpeg)
+
+
+### Architecture & Request Flow
+![alt text](omnimcp_flow.jpeg)
 
 ### How It Works
 
@@ -149,9 +153,8 @@ Both inject **behavioral instructions** that shape how the LLM uses the tools, n
 
 **Multi-server orchestration in action:**
 
-Claude Code generated a video using OmniMCP to coordinate multiple MCP servers.
+Claude Code generated a video using OmniMCP(previously pulsar-mcp) to coordinate multiple MCP servers.
 ![world_news_2025](https://github.com/user-attachments/assets/1f540910-3570-427a-881b-d769cb69abdf)
-🎥 (high quality) https://github.com/user-attachments/assets/c8715bdd-815a-4f92-9e8f-95043450474b
 
 **The process:**
 
@@ -380,8 +383,10 @@ uvx omnimcp serve --config-path mcp-servers.json --transport stdio
   "mcpServers": {
     "omnimcp": {
       "command": "uvx",
-      "args": ["omnimcp", "serve", "--config-path", "/path/to/mcp-servers.json", "--transport", "stdio"],
+      "args": ["omnimcp", "serve"],
       "env": {
+        "CONFIG_PATH": "/path/mcp/config/file",
+        "TRANSPORT": "stdio|http",
         "OPENAI_API_KEY": "sk-...",
         "QDRANT_DATA_PATH": "/path/to/qdrant_data",
         "TOOL_OFFLOADED_DATA_PATH": "/path/to/tool_offloaded_data"
