@@ -7,30 +7,39 @@ class TestApiKeysSettings:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("QDRANT_STORAGE_PATH", raising=False)
         monkeypatch.delenv("CONTENT_STORAGE_PATH", raising=False)
+        monkeypatch.delenv("CONFIG_PATH", raising=False)
 
         with pytest.raises(Exception):
             ApiKeysSettings()
 
     def test_minimal_config(self, monkeypatch):
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
         monkeypatch.setenv("QDRANT_STORAGE_PATH", "/tmp/qdrant")
         monkeypatch.setenv("CONTENT_STORAGE_PATH", "/tmp/content")
 
         settings = ApiKeysSettings()
+        assert settings.CONFIG_PATH == "/tmp/config.json"
         assert settings.OPENAI_API_KEY == "sk-test-key"
         assert settings.QDRANT_STORAGE_PATH == "/tmp/qdrant"
         assert settings.CONTENT_STORAGE_PATH == "/tmp/content"
 
     def test_default_values(self, monkeypatch):
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
         monkeypatch.setenv("QDRANT_STORAGE_PATH", "/tmp/qdrant")
         monkeypatch.setenv("CONTENT_STORAGE_PATH", "/tmp/content")
 
         settings = ApiKeysSettings()
+        # Server defaults
+        assert settings.TRANSPORT == "http"
+        assert settings.HOST == "localhost"
+        assert settings.PORT == 8000
+        # Model defaults
         assert settings.DESCRIPTOR_MODEL_NAME == "gpt-4.1-mini"
         assert settings.EMBEDDING_MODEL_NAME == "text-embedding-3-small"
         assert settings.DIMENSIONS == 1024
-        assert settings.INDEX_NAME == "pulsar_idx"
+        assert settings.INDEX_NAME == "omnimcp_idx"
         assert settings.MAX_RESULT_TOKENS == 5000
         assert settings.DESCRIBE_IMAGES is True
         assert settings.VISION_MODEL_NAME == "gpt-4.1-mini"
@@ -40,9 +49,13 @@ class TestApiKeysSettings:
         assert settings.BACKGROUND_MCP_TOOL_QUEUE_SIZE == 64
 
     def test_custom_values(self, monkeypatch):
+        monkeypatch.setenv("CONFIG_PATH", "/custom/config.json")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-custom-key")
         monkeypatch.setenv("QDRANT_STORAGE_PATH", "/custom/qdrant")
         monkeypatch.setenv("CONTENT_STORAGE_PATH", "/custom/content")
+        monkeypatch.setenv("TRANSPORT", "stdio")
+        monkeypatch.setenv("HOST", "0.0.0.0")
+        monkeypatch.setenv("PORT", "9000")
         monkeypatch.setenv("DESCRIPTOR_MODEL_NAME", "gpt-4o")
         monkeypatch.setenv("EMBEDDING_MODEL_NAME", "text-embedding-3-large")
         monkeypatch.setenv("DIMENSIONS", "3072")
@@ -51,7 +64,11 @@ class TestApiKeysSettings:
         monkeypatch.setenv("DESCRIBE_IMAGES", "false")
 
         settings = ApiKeysSettings()
+        assert settings.CONFIG_PATH == "/custom/config.json"
         assert settings.OPENAI_API_KEY == "sk-custom-key"
+        assert settings.TRANSPORT == "stdio"
+        assert settings.HOST == "0.0.0.0"
+        assert settings.PORT == 9000
         assert settings.DESCRIPTOR_MODEL_NAME == "gpt-4o"
         assert settings.EMBEDDING_MODEL_NAME == "text-embedding-3-large"
         assert settings.DIMENSIONS == 3072

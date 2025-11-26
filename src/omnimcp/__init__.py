@@ -9,6 +9,12 @@ from omnimcp.utilities import load_mcp_config
 from dotenv import load_dotenv
 
 
+def build_settings(**cli_overrides) -> ApiKeysSettings:
+    """Build ApiKeysSettings with CLI overrides (non-None values take precedence)."""
+    overrides = {k: v for k, v in cli_overrides.items() if v is not None}
+    return ApiKeysSettings(**overrides)
+
+
 @click.group()
 def cli():
     """OmniMCP - Semantic router for MCP ecosystems"""
@@ -16,22 +22,27 @@ def cli():
 
 
 @cli.command()
-@click.option(
-    '--config',
-    type=click.Path(exists=True, dir_okay=False, readable=True),
-    required=True,
-    help='Path to the MCP server configuration file.'
-)
-def index(config: str) -> None:
+@click.option('--config', 'CONFIG_PATH', type=click.Path(exists=True, dir_okay=False, readable=True), default=None, envvar='CONFIG_PATH', help='Path to the MCP server configuration file.')
+@click.option('--openai-api-key', 'OPENAI_API_KEY', type=str, default=None, envvar='OPENAI_API_KEY', help='OpenAI API key.')
+@click.option('--qdrant-storage-path', 'QDRANT_STORAGE_PATH', type=str, default=None, envvar='QDRANT_STORAGE_PATH', help='Path to Qdrant storage.')
+@click.option('--content-storage-path', 'CONTENT_STORAGE_PATH', type=str, default=None, envvar='CONTENT_STORAGE_PATH', help='Path to content storage.')
+@click.option('--descriptor-model-name', 'DESCRIPTOR_MODEL_NAME', type=str, default=None, envvar='DESCRIPTOR_MODEL_NAME', help='Model for generating descriptions.')
+@click.option('--embedding-model-name', 'EMBEDDING_MODEL_NAME', type=str, default=None, envvar='EMBEDDING_MODEL_NAME', help='Model for embeddings.')
+@click.option('--vision-model-name', 'VISION_MODEL_NAME', type=str, default=None, envvar='VISION_MODEL_NAME', help='Model for vision/image description.')
+@click.option('--dimensions', 'DIMENSIONS', type=int, default=None, envvar='DIMENSIONS', help='Embedding dimensions.')
+@click.option('--index-name', 'INDEX_NAME', type=str, default=None, envvar='INDEX_NAME', help='Name of the vector index.')
+@click.option('--max-result-tokens', 'MAX_RESULT_TOKENS', type=int, default=None, envvar='MAX_RESULT_TOKENS', help='Max tokens before chunking results.')
+@click.option('--describe-images/--no-describe-images', 'DESCRIBE_IMAGES', default=None, envvar='DESCRIBE_IMAGES', help='Use vision to describe images.')
+def index(**kwargs) -> None:
     """Index MCP servers for semantic search."""
     load_dotenv()
-    api_keys_settings = ApiKeysSettings()
-    mcp_config = load_mcp_config(config)
+    settings = build_settings(**kwargs)
+    mcp_config = load_mcp_config(settings.CONFIG_PATH)
 
     async def async_index():
         logger.info("Starting indexing...")
         async with MCPEngine(
-            api_keys_settings=api_keys_settings,
+            api_keys_settings=settings,
             mcp_config=mcp_config,
             mode="index"
         ) as mcp_engine:
@@ -42,33 +53,38 @@ def index(config: str) -> None:
 
 
 @cli.command()
-@click.option(
-    '--config',
-    type=click.Path(exists=True, dir_okay=False, readable=True),
-    required=True,
-    help='Path to the MCP server configuration file.'
-)
-@click.option("--transport", type=click.Choice(["stdio", "http"]), default="http", help="Transport method.")
-@click.option("--host", type=str, default="localhost", help="Host for HTTP transport.")
-@click.option("--port", type=int, default=8000, help="Port for HTTP transport.")
-def serve(config: str, transport: str, host: str, port: int) -> None:
+@click.option('--config', 'CONFIG_PATH', type=click.Path(exists=True, dir_okay=False, readable=True), default=None, envvar='CONFIG_PATH', help='Path to the MCP server configuration file.')
+@click.option('--transport', 'TRANSPORT', type=click.Choice(["stdio", "http"]), default=None, envvar='TRANSPORT', help='Transport method.')
+@click.option('--host', 'HOST', type=str, default=None, envvar='HOST', help='Host for HTTP transport.')
+@click.option('--port', 'PORT', type=int, default=None, envvar='PORT', help='Port for HTTP transport.')
+@click.option('--openai-api-key', 'OPENAI_API_KEY', type=str, default=None, envvar='OPENAI_API_KEY', help='OpenAI API key.')
+@click.option('--qdrant-storage-path', 'QDRANT_STORAGE_PATH', type=str, default=None, envvar='QDRANT_STORAGE_PATH', help='Path to Qdrant storage.')
+@click.option('--content-storage-path', 'CONTENT_STORAGE_PATH', type=str, default=None, envvar='CONTENT_STORAGE_PATH', help='Path to content storage.')
+@click.option('--descriptor-model-name', 'DESCRIPTOR_MODEL_NAME', type=str, default=None, envvar='DESCRIPTOR_MODEL_NAME', help='Model for generating descriptions.')
+@click.option('--embedding-model-name', 'EMBEDDING_MODEL_NAME', type=str, default=None, envvar='EMBEDDING_MODEL_NAME', help='Model for embeddings.')
+@click.option('--vision-model-name', 'VISION_MODEL_NAME', type=str, default=None, envvar='VISION_MODEL_NAME', help='Model for vision/image description.')
+@click.option('--dimensions', 'DIMENSIONS', type=int, default=None, envvar='DIMENSIONS', help='Embedding dimensions.')
+@click.option('--index-name', 'INDEX_NAME', type=str, default=None, envvar='INDEX_NAME', help='Name of the vector index.')
+@click.option('--max-result-tokens', 'MAX_RESULT_TOKENS', type=int, default=None, envvar='MAX_RESULT_TOKENS', help='Max tokens before chunking results.')
+@click.option('--describe-images/--no-describe-images', 'DESCRIBE_IMAGES', default=None, envvar='DESCRIBE_IMAGES', help='Use vision to describe images.')
+def serve(**kwargs) -> None:
     """Index (if needed) and start the MCP server."""
     load_dotenv()
-    api_keys_settings = ApiKeysSettings()
-    mcp_config = load_mcp_config(config)
+    settings = build_settings(**kwargs)
+    mcp_config = load_mcp_config(settings.CONFIG_PATH)
 
     async def async_serve():
         async with MCPEngine(
-            api_keys_settings=api_keys_settings,
+            api_keys_settings=settings,
             mcp_config=mcp_config,
             mode="serve"
         ) as mcp_engine:
             await mcp_engine.index_mcp_servers()
             mcp_server = MCPServer(mcp_engine=mcp_engine)
             await mcp_server.run_server(
-                transport=transport,
-                host=host,
-                port=port
+                transport=settings.TRANSPORT,
+                host=settings.HOST,
+                port=settings.PORT
             )
 
     asyncio.run(async_serve())
