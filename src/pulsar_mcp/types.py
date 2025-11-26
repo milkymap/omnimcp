@@ -24,6 +24,6 @@ class McpServerDescription(BaseModel):
 class McpServerToolDescription(BaseModel):
     title: str = Field(description="A short, descriptive technical title for the tool")
     summary: str = Field(description="A brief summary of the tool's purpose and functionality")
-    uttirances: List[str] = Field(description="Example utterances or commands that can be used to invoke the tool")
+    utterances: List[str] = Field(description="Example utterances or commands that can be used to invoke the tool")
 
     

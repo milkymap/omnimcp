@@ -66,7 +66,7 @@ class IndexService:
                         "server_name": server_name,
                         "title": enhanced_tool.title,
                         "summary": enhanced_tool.summary,
-                        "utterances": enhanced_tool.uttirances,
+                        "utterances": enhanced_tool.utterances,
                         "tool_name": tool_name,
                         "tool_description": tool_description,
                         "tool_schema": tool_schema

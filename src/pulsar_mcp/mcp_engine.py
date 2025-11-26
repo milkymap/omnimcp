@@ -212,7 +212,7 @@ class MCPEngine:
             text = (
                 f"{tool_desc.title}\n"
                 f"{tool_desc.summary}\n"
-                f"Example Utterances: {', '.join(tool_desc.uttirances)}"
+                f"Example Utterances: {', '.join(tool_desc.utterances)}"
             )
             texts.append(text)
         

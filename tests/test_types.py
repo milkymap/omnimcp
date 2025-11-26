@@ -101,7 +101,7 @@ class TestMcpServerToolDescription:
         desc = McpServerToolDescription(
             title="Read File Tool",
             summary="Reads content from a file",
-            uttirances=["read the file", "get file content", "show me the file"]
+            utterances=["read the file", "get file content", "show me the file"]
         )
         assert desc.title == "Read File Tool"
-        assert len(desc.uttirances) == 3
+        assert len(desc.utterances) == 3
