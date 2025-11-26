@@ -150,8 +150,8 @@ Both inject **behavioral instructions** that shape how the LLM uses the tools, n
 **Multi-server orchestration in action:**
 
 Claude Code generated a video using Pulsar to coordinate multiple MCP servers.
-
-🎥 https://github.com/user-attachments/assets/c8715bdd-815a-4f92-9e8f-95043450474b
+![world_news_2025](https://github.com/user-attachments/assets/1f540910-3570-427a-881b-d769cb69abdf)
+🎥 (high quality) https://github.com/user-attachments/assets/c8715bdd-815a-4f92-9e8f-95043450474b
 
 **The process:**
 
@@ -182,7 +182,7 @@ With Pulsar: Discover → Execute → Coordinate. Seamlessly.
 ## Installation
 
 ```bash
-uv pip install pulsar-mcp
+uv pip install pulsar-mcp // or uv add pulsar-mcp 
 ```
 
 ## Configuration
