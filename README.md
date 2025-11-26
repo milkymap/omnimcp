@@ -398,7 +398,7 @@ uvx pulsar-mcp serve --config mcp-servers.json --transport stdio
 
 **Error: `spawn uvx ENOENT` or `command not found: uvx`**
 
-This means `uv` is not installed or not in your PATH. [See detailed troubleshooting guide](https://github.com/anthropics/anthropic-cookbook/blob/main/misc/mcp_local_server_troubleshooting.md).
+This means `uv` is not installed or not in your PATH. [See official MCP server guide](https://modelcontextprotocol.io/docs/develop/build-server).
 
 **Quick fixes:**
 
@@ -423,9 +423,10 @@ This means `uv` is not installed or not in your PATH. [See detailed troubleshoot
    sudo ln -s ~/.local/bin/uvx /usr/local/bin/uvx
    ```
 
-3. **Use absolute path** in config:
+3. **Use absolute path** in config (find with `which uvx`):
    ```json
-   "command": "/Users/you/.local/bin/uvx"  // macOS example
+   "command": "/Users/you/.local/bin/uvx"  // macOS
+   "command": "C:\\Users\\you\\.local\\bin\\uvx.exe"  // Windows
    ```
 
 **Alternative: Use mcp-remote for HTTP mode**
