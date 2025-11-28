@@ -230,11 +230,12 @@ QDRANT_DATA_PATH=/path/to/qdrant_data
 TOOL_OFFLOADED_DATA_PATH=/path/to/tool_offloaded_data
 ```
 
-Then source it before running commands:
+Then use the `--env-file` flag when running commands:
 ```bash
-source .env  # or use: export $(cat .env | xargs)
-uvx omnimcp index --config-path mcp-servers.json
+uvx --env-file .env omnimcp index --config-path mcp-servers.json
 ```
+
+**Note:** Sourcing environment variables (e.g., `source .env`) does not work reliably with `uvx`. Always use `--env-file` or export variables directly.
 
 **Note:** For stdio transport, environment variables must also be included in your MCP client config (see [stdio transport section](#stdio-transport) below).
 
@@ -311,17 +312,26 @@ export TOOL_OFFLOADED_DATA_PATH="/path/to/tool_offloaded_data"
 **3. Index your servers** (recommended before serving):
 
 ```bash
-uvx omnimcp index --config-path mcp-servers.json
+uvx --env-file .env omnimcp index --config-path mcp-servers.json
 ```
 
 **4. Run the server**:
 
 ```bash
 # Default: HTTP transport (recommended)
-uvx omnimcp serve --config-path mcp-servers.json --transport http --host 0.0.0.0 --port 8000
+uvx --env-file .env omnimcp serve --config-path mcp-servers.json --transport http --host 0.0.0.0 --port 8000
 
 # stdio transport (for local MCP clients - requires pre-indexing)
-uvx omnimcp serve --config-path mcp-servers.json --transport stdio
+uvx --env-file .env omnimcp serve --config-path mcp-servers.json --transport stdio
+```
+
+**Alternatively, use CLI options directly:**
+```bash
+uvx omnimcp serve \
+  --config-path mcp-servers.json \
+  --openai-api-key "sk-..." \
+  --qdrant-data-path /path/to/qdrant_data \
+  --tool-offloaded-data-path /path/to/tool_offloaded_data
 ```
 
 ## Transport Modes
