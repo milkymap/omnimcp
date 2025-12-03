@@ -29,3 +29,14 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t omnimcp:test -f Dockerfile .
+
+      - name: Verify image runs
+        run: docker run --rm omnimcp:test --help
