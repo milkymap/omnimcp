@@ -13,6 +13,7 @@ from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from pathlib import Path
 
 from mcp import StdioServerParameters, ClientSession, stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 from mcp.types import Tool, ContentBlock, ListToolsResult
 
 from tiktoken import encoding_for_model
@@ -313,15 +314,31 @@ class MCPEngine:
         
         return tool_call_result
         
-    async def background_mcp_server(self, server_name:str, mcp_startup_config:McpStartupConfig, timeout:int=50):
-        server_parameters = StdioServerParameters(
-            command=mcp_startup_config.command,
-            args=mcp_startup_config.args,
-            env=mcp_startup_config.env
-        )
+    async def background_mcp_server(self, server_name: str, mcp_startup_config: McpStartupConfig, timeout: int = 50):
         async with AsyncExitStack() as resources_manager:
-            transport = await resources_manager.enter_async_context(stdio_client(server=server_parameters))
-            read, write = transport 
+            if mcp_startup_config.transport == "http":
+                # HTTP transport - connect to remote server
+                logger.info(f"Connecting to MCP server {server_name} via HTTP: {mcp_startup_config.url}")
+                transport = await resources_manager.enter_async_context(
+                    streamablehttp_client(
+                        mcp_startup_config.url,
+                        headers=mcp_startup_config.headers if mcp_startup_config.headers else None
+                    )
+                )
+                read, write, _ = transport  # streamablehttp_client returns 3 values
+            else:
+                # stdio transport - spawn subprocess
+                logger.info(f"Starting MCP server {server_name} via stdio: {mcp_startup_config.command}")
+                server_parameters = StdioServerParameters(
+                    command=mcp_startup_config.command,
+                    args=mcp_startup_config.args,
+                    env=mcp_startup_config.env
+                )
+                transport = await resources_manager.enter_async_context(
+                    stdio_client(server=server_parameters)
+                )
+                read, write = transport
+
             session = await resources_manager.enter_async_context(ClientSession(read, write))
             try:
                 async with asyncio.timeout(delay=timeout):
