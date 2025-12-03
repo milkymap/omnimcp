@@ -1,0 +1,91 @@
+# =============================================================================
+# OmniMCP Docker Ignore
+# =============================================================================
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+
+# Local data (should be mounted)
+/data/
+*.db
+*.sqlite
+
+# Qdrant local storage
+qdrant_storage/
+
+# Tool offloaded data
+tool_offloaded_data/
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# Misc
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Claude/AI config
+.claude/
+.mcp.json
+mcp_config.json
+
+# Lock files that aren't needed
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

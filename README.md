@@ -560,6 +560,69 @@ poll_task_result(task_id)
 # Returns: status, result when done
 ```
 
+## Docker
+
+OmniMCP can be run in a Docker container with full support for both `npx` (Node.js MCP servers) and `uvx` (Python MCP servers).
+
+### Build
+
+```bash
+docker build -t omnimcp:latest -f Dockerfile .
+```
+
+### Run
+
+```bash
+docker run --rm -it \
+  -v /path/to/qdrant_data:/data/qdrant \
+  -v /path/to/tool_offloaded_data:/data/tool_offloaded_data \
+  -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
+  --env-file .env.docker \
+  -p 8000:8000 \
+  omnimcp:latest serve
+```
+
+**Environment file** (`.env.docker`):
+```bash
+OPENAI_API_KEY=sk-proj-...
+TRANSPORT=http
+HOST=0.0.0.0
+PORT=8000
+# Choose ONE Qdrant mode:
+QDRANT_DATA_PATH=/data/qdrant
+# OR for remote: QDRANT_URL=http://qdrant:6333
+```
+
+**Available commands:**
+```bash
+# Show help
+docker run --rm omnimcp:latest --help
+
+# Index servers
+docker run --rm \
+  -v /path/to/qdrant_data:/data/qdrant \
+  -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
+  --env-file .env.docker \
+  omnimcp:latest index
+
+# Serve (HTTP mode)
+docker run --rm -d \
+  -v /path/to/qdrant_data:/data/qdrant \
+  -v /path/to/tool_offloaded_data:/data/tool_offloaded_data \
+  -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
+  --env-file .env.docker \
+  -p 8000:8000 \
+  --name omnimcp \
+  omnimcp:latest serve
+```
+
+**Volume mounts:**
+| Mount | Purpose |
+|-------|---------|
+| `/data/qdrant` | Qdrant vector database storage (persistent) |
+| `/data/tool_offloaded_data` | Large content storage (persistent) |
+| `/app/config/mcp-servers.json` | MCP servers configuration (read-only) |
+
 ## Development
 
 ```bash
