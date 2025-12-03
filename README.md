@@ -572,6 +572,7 @@ docker build -t omnimcp:latest -f Dockerfile .
 
 ### Run
 
+**With local Qdrant storage:**
 ```bash
 docker run --rm -it \
   -v /path/to/qdrant_data:/data/qdrant \
@@ -582,15 +583,31 @@ docker run --rm -it \
   omnimcp:latest serve
 ```
 
-**Environment file** (`.env.docker`):
+**With remote Qdrant (Cloud or Docker):**
+```bash
+docker run --rm -it \
+  -v /path/to/tool_offloaded_data:/data/tool_offloaded_data \
+  -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
+  --env-file .env.docker \
+  -p 8000:8000 \
+  omnimcp:latest serve
+```
+
+**Environment file** (`.env.docker`) - choose ONE Qdrant mode:
 ```bash
 OPENAI_API_KEY=sk-proj-...
+CONFIG_PATH=/app/config/mcp-servers.json
+TOOL_OFFLOADED_DATA_PATH=/data/tool_offloaded_data
 TRANSPORT=http
 HOST=0.0.0.0
 PORT=8000
-# Choose ONE Qdrant mode:
+
+# Option 1: Local Qdrant storage
 QDRANT_DATA_PATH=/data/qdrant
-# OR for remote: QDRANT_URL=http://qdrant:6333
+
+# Option 2: Remote Qdrant (comment out QDRANT_DATA_PATH above)
+# QDRANT_URL=https://your-cluster.qdrant.io
+# QDRANT_API_KEY=your-api-key
 ```
 
 **Available commands:**
@@ -600,28 +617,18 @@ docker run --rm omnimcp:latest --help
 
 # Index servers
 docker run --rm \
-  -v /path/to/qdrant_data:/data/qdrant \
   -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
   --env-file .env.docker \
   omnimcp:latest index
 
 # Serve (HTTP mode)
 docker run --rm -d \
-  -v /path/to/qdrant_data:/data/qdrant \
-  -v /path/to/tool_offloaded_data:/data/tool_offloaded_data \
   -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
   --env-file .env.docker \
   -p 8000:8000 \
   --name omnimcp \
   omnimcp:latest serve
 ```
-
-**Volume mounts:**
-| Mount | Purpose |
-|-------|---------|
-| `/data/qdrant` | Qdrant vector database storage (persistent) |
-| `/data/tool_offloaded_data` | Large content storage (persistent) |
-| `/app/config/mcp-servers.json` | MCP servers configuration (read-only) |
 
 ## Development
 

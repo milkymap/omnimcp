@@ -47,7 +47,7 @@ WORKDIR /app
 RUN chmod -R g+rwx /app
 
 # Create data directories
-RUN mkdir -p /data/qdrant /data/tool_offloaded_data /app/config
+RUN mkdir -p /data
 
 # Copy project files
 COPY . ./
@@ -59,11 +59,8 @@ RUN uv venv && uv sync --frozen --no-dev
 ENV PYTHONUNBUFFERED=1 \
     TRANSPORT=http \
     HOST=0.0.0.0 \
-    PORT=8000 \
-    QDRANT_DATA_PATH=/data/qdrant \
-    TOOL_OFFLOADED_DATA_PATH=/data/tool_offloaded_data \
-    CONFIG_PATH=/app/config/mcp-servers.json
-
+    PORT=8000 
+    
 EXPOSE 8000
 
 # Run using uv
