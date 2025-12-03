@@ -624,7 +624,15 @@ poll_task_result(task_id)
 
 OmniMCP can be run in a Docker container with full support for both `npx` (Node.js MCP servers) and `uvx` (Python MCP servers).
 
-### Build
+### Pull from Docker Hub
+
+```bash
+docker pull milkymap/omnimcp:latest
+```
+
+[![Docker Hub](https://img.shields.io/docker/v/milkymap/omnimcp?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/milkymap/omnimcp)
+
+### Build Locally (Optional)
 
 ```bash
 docker build -t omnimcp:latest -f Dockerfile .
@@ -640,7 +648,7 @@ docker run --rm -it \
   -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
   --env-file .env.docker \
   -p 8000:8000 \
-  omnimcp:latest serve
+  milkymap/omnimcp:latest serve
 ```
 
 **With remote Qdrant (Cloud or Docker):**
@@ -650,7 +658,7 @@ docker run --rm -it \
   -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
   --env-file .env.docker \
   -p 8000:8000 \
-  omnimcp:latest serve
+  milkymap/omnimcp:latest serve
 ```
 
 **Environment file** (`.env.docker`) - choose ONE Qdrant mode:
@@ -673,13 +681,13 @@ QDRANT_DATA_PATH=/data/qdrant
 **Available commands:**
 ```bash
 # Show help
-docker run --rm omnimcp:latest --help
+docker run --rm milkymap/omnimcp:latest --help
 
 # Index servers
 docker run --rm \
   -v /path/to/mcp-servers.json:/app/config/mcp-servers.json:ro \
   --env-file .env.docker \
-  omnimcp:latest index
+  milkymap/omnimcp:latest index
 
 # Serve (HTTP mode)
 docker run --rm -d \
@@ -687,7 +695,7 @@ docker run --rm -d \
   --env-file .env.docker \
   -p 8000:8000 \
   --name omnimcp \
-  omnimcp:latest serve
+  milkymap/omnimcp:latest serve
 ```
 
 ## Development
