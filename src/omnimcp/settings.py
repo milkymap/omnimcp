@@ -13,11 +13,45 @@ class ApiKeysSettings(BaseSettings):
     # API Keys
     OPENAI_API_KEY: str = Field(validation_alias="OPENAI_API_KEY")
 
-    # Model settings
+    # Azure OpenAI settings (optional - when set, enables Azure mode)
+    OPENAI_API_ENDPOINT: Optional[str] = Field(default=None, validation_alias="OPENAI_API_ENDPOINT")
+    OPENAI_API_VERSION: Optional[str] = Field(default=None, validation_alias="OPENAI_API_VERSION")
+    OPENAI_API_LLM_DEPLOYMENT_NAME: Optional[str] = Field(default=None, validation_alias="OPENAI_API_LLM_DEPLOYMENT_NAME")
+    OPENAI_API_EMBEDDING_DEPLOYMENT_NAME: Optional[str] = Field(default=None, validation_alias="OPENAI_API_EMBEDDING_DEPLOYMENT_NAME")
+
+    # Model settings (used for standard OpenAI, ignored when Azure is configured)
     DESCRIPTOR_MODEL_NAME: str = Field("gpt-4.1-mini", validation_alias="DESCRIPTOR_MODEL_NAME")
     EMBEDDING_MODEL_NAME: str = Field("text-embedding-3-small", validation_alias="EMBEDDING_MODEL_NAME")
     VISION_MODEL_NAME: str = Field("gpt-4.1-mini", validation_alias="VISION_MODEL_NAME")
     DIMENSIONS: int = Field(1024, validation_alias="DIMENSIONS")
+
+    @property
+    def is_azure(self) -> bool:
+        """Check if Azure OpenAI is configured."""
+        return self.OPENAI_API_ENDPOINT is not None
+
+    @model_validator(mode="after")
+    def validate_azure_config(self):
+        """Validate Azure OpenAI configuration when endpoint is set."""
+        if self.OPENAI_API_ENDPOINT is not None:
+            missing = []
+            if not self.OPENAI_API_VERSION:
+                missing.append("OPENAI_API_VERSION")
+            if not self.OPENAI_API_LLM_DEPLOYMENT_NAME:
+                missing.append("OPENAI_API_LLM_DEPLOYMENT_NAME")
+            if not self.OPENAI_API_EMBEDDING_DEPLOYMENT_NAME:
+                missing.append("OPENAI_API_EMBEDDING_DEPLOYMENT_NAME")
+
+            if missing:
+                raise ValueError(
+                    f"Azure OpenAI endpoint is configured but missing required settings: {', '.join(missing)}.\n"
+                    "When using Azure OpenAI, you must provide:\n"
+                    "  - OPENAI_API_ENDPOINT (e.g., 'https://your-resource.openai.azure.com')\n"
+                    "  - OPENAI_API_VERSION (e.g., '2024-02-15-preview')\n"
+                    "  - OPENAI_API_LLM_DEPLOYMENT_NAME (your chat/completion deployment)\n"
+                    "  - OPENAI_API_EMBEDDING_DEPLOYMENT_NAME (your embedding deployment)"
+                )
+        return self
 
     # Storage settings
     INDEX_NAME: str = Field("omnimcp_idx", validation_alias="INDEX_NAME")

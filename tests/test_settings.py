@@ -167,3 +167,107 @@ class TestQdrantConnectionModes:
 
         with pytest.raises(ValueError, match="QDRANT_API_KEY requires QDRANT_URL"):
             ApiKeysSettings()
+
+
+class TestAzureOpenAIConfig:
+    """Tests for Azure OpenAI configuration."""
+
+    def _clear_azure_env(self, monkeypatch):
+        """Helper to clear Azure-specific env vars."""
+        monkeypatch.delenv("OPENAI_API_ENDPOINT", raising=False)
+        monkeypatch.delenv("OPENAI_API_VERSION", raising=False)
+        monkeypatch.delenv("OPENAI_API_LLM_DEPLOYMENT_NAME", raising=False)
+        monkeypatch.delenv("OPENAI_API_EMBEDDING_DEPLOYMENT_NAME", raising=False)
+
+    def test_standard_openai_mode(self, monkeypatch):
+        """Test standard OpenAI mode (no Azure settings)."""
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
+        monkeypatch.setenv("QDRANT_DATA_PATH", "/tmp/qdrant_data")
+        monkeypatch.setenv("TOOL_OFFLOADED_DATA_PATH", "/tmp/tool_offloaded_data")
+        self._clear_azure_env(monkeypatch)
+
+        settings = ApiKeysSettings()
+        assert settings.is_azure is False
+        assert settings.OPENAI_API_ENDPOINT is None
+        assert settings.OPENAI_API_VERSION is None
+        assert settings.OPENAI_API_LLM_DEPLOYMENT_NAME is None
+        assert settings.OPENAI_API_EMBEDDING_DEPLOYMENT_NAME is None
+
+    def test_azure_openai_full_config(self, monkeypatch):
+        """Test full Azure OpenAI configuration."""
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
+        monkeypatch.setenv("OPENAI_API_KEY", "azure-api-key-123")
+        monkeypatch.setenv("QDRANT_DATA_PATH", "/tmp/qdrant_data")
+        monkeypatch.setenv("TOOL_OFFLOADED_DATA_PATH", "/tmp/tool_offloaded_data")
+        monkeypatch.setenv("OPENAI_API_ENDPOINT", "https://my-resource.openai.azure.com")
+        monkeypatch.setenv("OPENAI_API_VERSION", "2024-02-15-preview")
+        monkeypatch.setenv("OPENAI_API_LLM_DEPLOYMENT_NAME", "gpt-4-deployment")
+        monkeypatch.setenv("OPENAI_API_EMBEDDING_DEPLOYMENT_NAME", "embedding-deployment")
+
+        settings = ApiKeysSettings()
+        assert settings.is_azure is True
+        assert settings.OPENAI_API_ENDPOINT == "https://my-resource.openai.azure.com"
+        assert settings.OPENAI_API_VERSION == "2024-02-15-preview"
+        assert settings.OPENAI_API_LLM_DEPLOYMENT_NAME == "gpt-4-deployment"
+        assert settings.OPENAI_API_EMBEDDING_DEPLOYMENT_NAME == "embedding-deployment"
+
+    def test_azure_missing_api_version_fails(self, monkeypatch):
+        """Test that Azure endpoint without API version fails."""
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
+        monkeypatch.setenv("OPENAI_API_KEY", "azure-api-key-123")
+        monkeypatch.setenv("QDRANT_DATA_PATH", "/tmp/qdrant_data")
+        monkeypatch.setenv("TOOL_OFFLOADED_DATA_PATH", "/tmp/tool_offloaded_data")
+        monkeypatch.setenv("OPENAI_API_ENDPOINT", "https://my-resource.openai.azure.com")
+        monkeypatch.setenv("OPENAI_API_LLM_DEPLOYMENT_NAME", "gpt-4-deployment")
+        monkeypatch.setenv("OPENAI_API_EMBEDDING_DEPLOYMENT_NAME", "embedding-deployment")
+        monkeypatch.delenv("OPENAI_API_VERSION", raising=False)
+
+        with pytest.raises(ValueError, match="OPENAI_API_VERSION"):
+            ApiKeysSettings()
+
+    def test_azure_missing_llm_deployment_fails(self, monkeypatch):
+        """Test that Azure endpoint without LLM deployment name fails."""
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
+        monkeypatch.setenv("OPENAI_API_KEY", "azure-api-key-123")
+        monkeypatch.setenv("QDRANT_DATA_PATH", "/tmp/qdrant_data")
+        monkeypatch.setenv("TOOL_OFFLOADED_DATA_PATH", "/tmp/tool_offloaded_data")
+        monkeypatch.setenv("OPENAI_API_ENDPOINT", "https://my-resource.openai.azure.com")
+        monkeypatch.setenv("OPENAI_API_VERSION", "2024-02-15-preview")
+        monkeypatch.setenv("OPENAI_API_EMBEDDING_DEPLOYMENT_NAME", "embedding-deployment")
+        monkeypatch.delenv("OPENAI_API_LLM_DEPLOYMENT_NAME", raising=False)
+
+        with pytest.raises(ValueError, match="OPENAI_API_LLM_DEPLOYMENT_NAME"):
+            ApiKeysSettings()
+
+    def test_azure_missing_embedding_deployment_fails(self, monkeypatch):
+        """Test that Azure endpoint without embedding deployment name fails."""
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
+        monkeypatch.setenv("OPENAI_API_KEY", "azure-api-key-123")
+        monkeypatch.setenv("QDRANT_DATA_PATH", "/tmp/qdrant_data")
+        monkeypatch.setenv("TOOL_OFFLOADED_DATA_PATH", "/tmp/tool_offloaded_data")
+        monkeypatch.setenv("OPENAI_API_ENDPOINT", "https://my-resource.openai.azure.com")
+        monkeypatch.setenv("OPENAI_API_VERSION", "2024-02-15-preview")
+        monkeypatch.setenv("OPENAI_API_LLM_DEPLOYMENT_NAME", "gpt-4-deployment")
+        monkeypatch.delenv("OPENAI_API_EMBEDDING_DEPLOYMENT_NAME", raising=False)
+
+        with pytest.raises(ValueError, match="OPENAI_API_EMBEDDING_DEPLOYMENT_NAME"):
+            ApiKeysSettings()
+
+    def test_azure_missing_multiple_fields_lists_all(self, monkeypatch):
+        """Test that multiple missing Azure fields are all listed in error."""
+        monkeypatch.setenv("CONFIG_PATH", "/tmp/config.json")
+        monkeypatch.setenv("OPENAI_API_KEY", "azure-api-key-123")
+        monkeypatch.setenv("QDRANT_DATA_PATH", "/tmp/qdrant_data")
+        monkeypatch.setenv("TOOL_OFFLOADED_DATA_PATH", "/tmp/tool_offloaded_data")
+        monkeypatch.setenv("OPENAI_API_ENDPOINT", "https://my-resource.openai.azure.com")
+        self._clear_azure_env(monkeypatch)
+        monkeypatch.setenv("OPENAI_API_ENDPOINT", "https://my-resource.openai.azure.com")
+
+        with pytest.raises(ValueError) as exc_info:
+            ApiKeysSettings()
+
+        error_msg = str(exc_info.value)
+        assert "OPENAI_API_VERSION" in error_msg
+        assert "OPENAI_API_LLM_DEPLOYMENT_NAME" in error_msg
+        assert "OPENAI_API_EMBEDDING_DEPLOYMENT_NAME" in error_msg

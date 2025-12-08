@@ -2,10 +2,10 @@ import json
 import base64
 from uuid import uuid4
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Self
+from typing import List, Dict, Any, Optional, Self, Union
 
 import tiktoken
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AsyncAzureOpenAI
 
 from ..log import logger
 
@@ -17,19 +17,46 @@ class ContentManager:
         openai_api_key: str,
         max_tokens: int = 2000,
         describe_images: bool = True,
-        vision_model: str = "gpt-4.1-mini"
+        vision_model: str = "gpt-4.1-mini",
+        # Azure OpenAI settings (optional)
+        azure_endpoint: Optional[str] = None,
+        azure_api_version: Optional[str] = None,
+        azure_llm_deployment_name: Optional[str] = None,
     ):
         self.storage_path = Path(storage_path)
         self.max_tokens = max_tokens
         self.describe_images = describe_images
-        self.vision_model = vision_model
         self.openai_api_key = openai_api_key
         self.encoder = tiktoken.get_encoding("cl100k_base")
 
+        # Azure configuration
+        self.azure_endpoint = azure_endpoint
+        self.azure_api_version = azure_api_version
+
+        # Use deployment name for Azure, model name for standard OpenAI
+        if azure_endpoint and azure_llm_deployment_name:
+            self.vision_model = azure_llm_deployment_name
+        else:
+            self.vision_model = vision_model
+
+    @property
+    def is_azure(self) -> bool:
+        """Check if Azure OpenAI is configured."""
+        return self.azure_endpoint is not None
+
     async def __aenter__(self) -> Self:
         self.storage_path.mkdir(parents=True, exist_ok=True)
-        self.client = AsyncOpenAI(api_key=self.openai_api_key)
-        logger.info(f"ContentManager initialized with storage at {self.storage_path}")
+        if self.is_azure:
+            self.client: Union[AsyncOpenAI, AsyncAzureOpenAI] = AsyncAzureOpenAI(
+                api_key=self.openai_api_key,
+                azure_endpoint=self.azure_endpoint,
+                api_version=self.azure_api_version,
+            )
+            logger.info(f"ContentManager initialized with Azure OpenAI (deployment: {self.vision_model})")
+        else:
+            self.client = AsyncOpenAI(api_key=self.openai_api_key)
+            logger.info(f"ContentManager initialized with OpenAI (model: {self.vision_model})")
+        logger.info(f"ContentManager storage at {self.storage_path}")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

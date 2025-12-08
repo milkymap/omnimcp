@@ -12,11 +12,32 @@ def embedding_service():
     )
 
 
+@pytest.fixture
+def azure_embedding_service():
+    return EmbeddingService(
+        api_key="azure-api-key",
+        embedding_model_name="text-embedding-3-small",
+        dimension=1024,
+        azure_endpoint="https://my-resource.openai.azure.com",
+        azure_api_version="2024-02-15-preview",
+        azure_embedding_deployment_name="embedding-deployment",
+    )
+
+
 class TestEmbeddingServiceInit:
     def test_initialization(self, embedding_service):
         assert embedding_service.api_key == "test-api-key"
         assert embedding_service.embedding_model_name == "text-embedding-3-small"
         assert embedding_service.dimension == 1024
+        assert embedding_service.is_azure is False
+
+    def test_azure_initialization(self, azure_embedding_service):
+        assert azure_embedding_service.api_key == "azure-api-key"
+        assert azure_embedding_service.embedding_model_name == "embedding-deployment"
+        assert azure_embedding_service.dimension == 1024
+        assert azure_embedding_service.is_azure is True
+        assert azure_embedding_service.azure_endpoint == "https://my-resource.openai.azure.com"
+        assert azure_embedding_service.azure_api_version == "2024-02-15-preview"
 
 
 class TestEmbeddingServiceContextManager:

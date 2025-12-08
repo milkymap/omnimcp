@@ -12,10 +12,29 @@ def descriptor_service():
     )
 
 
+@pytest.fixture
+def azure_descriptor_service():
+    return DescriptorService(
+        openai_api_key="azure-api-key",
+        openai_model_name="gpt-4o-mini",
+        azure_endpoint="https://my-resource.openai.azure.com",
+        azure_api_version="2024-02-15-preview",
+        azure_llm_deployment_name="gpt-4-deployment",
+    )
+
+
 class TestDescriptorServiceInit:
     def test_initialization(self, descriptor_service):
         assert descriptor_service.api_key == "test-api-key"
         assert descriptor_service.openai_model_name == "gpt-4o-mini"
+        assert descriptor_service.is_azure is False
+
+    def test_azure_initialization(self, azure_descriptor_service):
+        assert azure_descriptor_service.api_key == "azure-api-key"
+        assert azure_descriptor_service.openai_model_name == "gpt-4-deployment"
+        assert azure_descriptor_service.is_azure is True
+        assert azure_descriptor_service.azure_endpoint == "https://my-resource.openai.azure.com"
+        assert azure_descriptor_service.azure_api_version == "2024-02-15-preview"
 
 
 class TestDescriptorServiceContextManager:

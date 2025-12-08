@@ -51,8 +51,23 @@ class MCPEngine:
         self.mcp_server_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_INDEX_RATE_LIMIT)
         self.mcp_server_tool_semaphore = asyncio.Semaphore(self.api_keys_settings.MCP_SERVER_TOOL_INDEX_RATE_LIMIT)
 
-        embedding_service = EmbeddingService(api_key=self.api_keys_settings.OPENAI_API_KEY, embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME, dimension=self.api_keys_settings.DIMENSIONS)
-        descriptor_service = DescriptorService(openai_api_key=self.api_keys_settings.OPENAI_API_KEY, openai_model_name=self.api_keys_settings.DESCRIPTOR_MODEL_NAME)
+        embedding_service = EmbeddingService(
+            api_key=self.api_keys_settings.OPENAI_API_KEY,
+            embedding_model_name=self.api_keys_settings.EMBEDDING_MODEL_NAME,
+            dimension=self.api_keys_settings.DIMENSIONS,
+            # Azure OpenAI settings (passed if configured)
+            azure_endpoint=self.api_keys_settings.OPENAI_API_ENDPOINT,
+            azure_api_version=self.api_keys_settings.OPENAI_API_VERSION,
+            azure_embedding_deployment_name=self.api_keys_settings.OPENAI_API_EMBEDDING_DEPLOYMENT_NAME,
+        )
+        descriptor_service = DescriptorService(
+            openai_api_key=self.api_keys_settings.OPENAI_API_KEY,
+            openai_model_name=self.api_keys_settings.DESCRIPTOR_MODEL_NAME,
+            # Azure OpenAI settings (passed if configured)
+            azure_endpoint=self.api_keys_settings.OPENAI_API_ENDPOINT,
+            azure_api_version=self.api_keys_settings.OPENAI_API_VERSION,
+            azure_llm_deployment_name=self.api_keys_settings.OPENAI_API_LLM_DEPLOYMENT_NAME,
+        )
 
         self.embedding_service = await self.resources_manager.enter_async_context(embedding_service)
         self.descriptor_service = await self.resources_manager.enter_async_context(descriptor_service)
@@ -71,7 +86,11 @@ class MCPEngine:
                 openai_api_key=self.api_keys_settings.OPENAI_API_KEY,
                 max_tokens=self.api_keys_settings.MAX_RESULT_TOKENS,
                 describe_images=self.api_keys_settings.DESCRIBE_IMAGES,
-                vision_model=self.api_keys_settings.VISION_MODEL_NAME
+                vision_model=self.api_keys_settings.VISION_MODEL_NAME,
+                # Azure OpenAI settings (passed if configured)
+                azure_endpoint=self.api_keys_settings.OPENAI_API_ENDPOINT,
+                azure_api_version=self.api_keys_settings.OPENAI_API_VERSION,
+                azure_llm_deployment_name=self.api_keys_settings.OPENAI_API_LLM_DEPLOYMENT_NAME,
             )
             self.content_manager = await self.resources_manager.enter_async_context(content_manager)
 

@@ -221,6 +221,41 @@ OmniMCP requires several environment variables to operate. You must configure th
 | `DESCRIBE_IMAGES` | `true` | Use vision to describe images |
 | `DIMENSIONS` | `1024` | Embedding dimensions |
 
+### Azure OpenAI Support
+
+OmniMCP supports Azure OpenAI as an alternative to standard OpenAI. Azure mode is **automatically enabled** when you set `OPENAI_API_ENDPOINT`.
+
+**Azure-specific variables (all required when using Azure):**
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | Your Azure OpenAI API key | `your-azure-api-key` |
+| `OPENAI_API_ENDPOINT` | Azure OpenAI endpoint URL | `https://your-resource.openai.azure.com` |
+| `OPENAI_API_VERSION` | Azure API version | `2024-02-15-preview` |
+| `OPENAI_API_LLM_DEPLOYMENT_NAME` | Deployment name for chat/completions | `gpt-4-deployment` |
+| `OPENAI_API_EMBEDDING_DEPLOYMENT_NAME` | Deployment name for embeddings | `text-embedding-deployment` |
+
+**Azure setup example:**
+
+```bash
+# .env for Azure OpenAI
+OPENAI_API_KEY=your-azure-api-key
+OPENAI_API_ENDPOINT=https://your-resource.openai.azure.com
+OPENAI_API_VERSION=2024-02-15-preview
+OPENAI_API_LLM_DEPLOYMENT_NAME=gpt-4-deployment
+OPENAI_API_EMBEDDING_DEPLOYMENT_NAME=text-embedding-deployment
+
+# Qdrant (same as standard setup)
+QDRANT_DATA_PATH=/path/to/qdrant_data
+TOOL_OFFLOADED_DATA_PATH=/path/to/tool_offloaded_data
+```
+
+**Important notes:**
+- When `OPENAI_API_ENDPOINT` is set, OmniMCP uses Azure OpenAI for all LLM operations
+- The `*_DEPLOYMENT_NAME` variables must match your actual Azure deployment names (not model names)
+- Standard OpenAI model settings (`EMBEDDING_MODEL_NAME`, `DESCRIPTOR_MODEL_NAME`, `VISION_MODEL_NAME`) are ignored when using Azure
+- Azure uses deployment names instead of model names for API calls
+
 **Setup methods:**
 
 **Option 1: Local file storage (simplest)**

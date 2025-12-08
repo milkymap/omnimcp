@@ -1,9 +1,9 @@
-import json 
+import json
 import asyncio
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AsyncAzureOpenAI
 from openai.types.chat import ParsedChatCompletion
-from typing import List, Dict, Any, Self  
+from typing import List, Dict, Any, Self, Optional, Union
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -11,12 +11,43 @@ from ..types import McpServerDescription, McpServerToolDescription
 from ..log import logger
 
 class DescriptorService:
-    def __init__(self, openai_api_key:str, openai_model_name:str):
+    def __init__(
+        self,
+        openai_api_key: str,
+        openai_model_name: str,
+        # Azure OpenAI settings (optional)
+        azure_endpoint: Optional[str] = None,
+        azure_api_version: Optional[str] = None,
+        azure_llm_deployment_name: Optional[str] = None,
+    ):
         self.api_key = openai_api_key
-        self.openai_model_name = openai_model_name
-    
+
+        # Azure configuration
+        self.azure_endpoint = azure_endpoint
+        self.azure_api_version = azure_api_version
+
+        # Use deployment name for Azure, model name for standard OpenAI
+        if azure_endpoint and azure_llm_deployment_name:
+            self.openai_model_name = azure_llm_deployment_name
+        else:
+            self.openai_model_name = openai_model_name
+
+    @property
+    def is_azure(self) -> bool:
+        """Check if Azure OpenAI is configured."""
+        return self.azure_endpoint is not None
+
     async def __aenter__(self) -> Self:
-        self.client = AsyncOpenAI(api_key=self.api_key)
+        if self.is_azure:
+            self.client: Union[AsyncOpenAI, AsyncAzureOpenAI] = AsyncAzureOpenAI(
+                api_key=self.api_key,
+                azure_endpoint=self.azure_endpoint,
+                api_version=self.azure_api_version,
+            )
+            logger.info(f"DescriptorService initialized with Azure OpenAI (deployment: {self.openai_model_name})")
+        else:
+            self.client = AsyncOpenAI(api_key=self.api_key)
+            logger.info(f"DescriptorService initialized with OpenAI (model: {self.openai_model_name})")
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):

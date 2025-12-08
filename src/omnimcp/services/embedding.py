@@ -1,18 +1,50 @@
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AsyncAzureOpenAI
 from openai.types.create_embedding_response import CreateEmbeddingResponse
 from openai.types.embedding import Embedding
 
-from typing import List, Self
+from typing import List, Self, Optional, Union
 from ..log import logger
 
 class EmbeddingService:
-    def __init__(self, api_key: str, embedding_model_name:str, dimension:int):
+    def __init__(
+        self,
+        api_key: str,
+        embedding_model_name: str,
+        dimension: int,
+        # Azure OpenAI settings (optional)
+        azure_endpoint: Optional[str] = None,
+        azure_api_version: Optional[str] = None,
+        azure_embedding_deployment_name: Optional[str] = None,
+    ):
         self.api_key = api_key
-        self.embedding_model_name = embedding_model_name
         self.dimension = dimension
 
+        # Azure configuration
+        self.azure_endpoint = azure_endpoint
+        self.azure_api_version = azure_api_version
+
+        # Use deployment name for Azure, model name for standard OpenAI
+        if azure_endpoint and azure_embedding_deployment_name:
+            self.embedding_model_name = azure_embedding_deployment_name
+        else:
+            self.embedding_model_name = embedding_model_name
+
+    @property
+    def is_azure(self) -> bool:
+        """Check if Azure OpenAI is configured."""
+        return self.azure_endpoint is not None
+
     async def __aenter__(self) -> Self:
-        self.client = AsyncOpenAI(api_key=self.api_key)
+        if self.is_azure:
+            self.client: Union[AsyncOpenAI, AsyncAzureOpenAI] = AsyncAzureOpenAI(
+                api_key=self.api_key,
+                azure_endpoint=self.azure_endpoint,
+                api_version=self.azure_api_version,
+            )
+            logger.info(f"EmbeddingService initialized with Azure OpenAI (deployment: {self.embedding_model_name})")
+        else:
+            self.client = AsyncOpenAI(api_key=self.api_key)
+            logger.info(f"EmbeddingService initialized with OpenAI (model: {self.embedding_model_name})")
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
